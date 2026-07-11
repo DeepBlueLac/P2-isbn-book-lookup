@@ -116,10 +116,18 @@ export async function GET(request: NextRequest) {
   if (freeOnly) params.set("filter", "free-ebooks");
 
   try {
-    const response = await fetch(`https://www.googleapis.com/books/v1/volumes?${params}`, {
-      signal: AbortSignal.timeout(10_000),
-      next: { revalidate: 3600 },
-    });
+    const hosts = ["www.googleapis.com", "books.googleapis.com", "www.googleapis.com"];
+    let response: Response | null = null;
+    for (let attempt = 0; attempt < hosts.length; attempt += 1) {
+      response = await fetch(`https://${hosts[attempt]}/books/v1/volumes?${params}`, {
+        signal: AbortSignal.timeout(10_000),
+        cache: "no-store",
+      });
+      if (response.ok || (response.status < 500 && response.status !== 429)) break;
+      await new Promise((resolve) => setTimeout(resolve, 350 * (attempt + 1)));
+    }
+
+    if (!response) throw new Error("No response from Google Books API");
 
     if (!response.ok) {
       const upstream = (await response.json().catch(() => null)) as { error?: { message?: string; status?: string } } | null;
@@ -141,7 +149,10 @@ export async function GET(request: NextRequest) {
 
     const data = (await response.json()) as { totalItems?: number; items?: GoogleVolume[] };
     const books = (data.items || []).map(normalize);
-    return NextResponse.json({ total: data.totalItems || 0, books });
+    return NextResponse.json(
+      { total: data.totalItems || 0, books },
+      { headers: { "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400" } },
+    );
   } catch {
     return NextResponse.json({ error: "图书服务响应超时，请稍后再试" }, { status: 504 });
   }
