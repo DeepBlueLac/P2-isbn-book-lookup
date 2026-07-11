@@ -122,9 +122,19 @@ export async function GET(request: NextRequest) {
     });
 
     if (!response.ok) {
+      const upstream = (await response.json().catch(() => null)) as { error?: { message?: string; status?: string } } | null;
       const status = response.status === 429 ? 429 : 502;
+      console.error("Google Books API request failed", {
+        status: response.status,
+        reason: upstream?.error?.status || "unknown",
+        message: upstream?.error?.message || "No error message returned",
+      });
       return NextResponse.json(
-        { error: response.status === 429 ? "查询次数过多，请稍后再试" : "Google Books 查询失败" },
+        {
+          error: response.status === 429 ? "查询次数过多，请稍后再试" : "Google Books 查询失败",
+          upstreamStatus: response.status,
+          upstreamReason: upstream?.error?.status || null,
+        },
         { status },
       );
     }
