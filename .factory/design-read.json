@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "productName": "Shelfmark",
+  "pageType": "hybrid",
+  "targetUser": "English-speaking readers looking for a legitimate way to access a known book",
+  "coreScenario": "Enter a title, author, or ISBN and choose a reading path within one minute",
+  "primaryInput": "Book title, author, or ISBN",
+  "primaryOutput": "A sourced book result with a legitimate next action",
+  "visualAnchor": {
+    "type": "result-preview",
+    "reason": "Readers judge usefulness from the real cover, access state, source, and next action",
+    "evidence": "Search results reserve the strongest visual hierarchy for real book records and access actions"
+  },
+  "brandMemory": [
+    "library shelfmark index rhythm",
+    "warm paper and deep forest ink",
+    "thin oxide-red catalog markers",
+    "editorial book-title typography"
+  ],
+  "antiTemplateDirections": [
+    "avoid generic SaaS three-card hero",
+    "avoid fake social proof and empty marketing copy",
+    "avoid copying the-sky-then stars, glass, grayscale, typography, or layout",
+    "avoid decorative CSS book illustrations"
+  ],
+  "firstViewport": {
+    "mustSee": "brand promise, one search input, reading-path legend, and local shelf value",
+    "primaryAction": "Find this book",
+    "visualWeight": "search and real result preview dominate; explanation remains compact"
+  },
+  "responsive": {
+    "desktop1440": "two-part catalog desk with search dominant and result rows exposing direct actions",
+    "tablet768": "single-column flow with search and results before source transparency",
+    "mobile390": "compact brand, full-width search action, direct result action, and single-column shelf"
+  },
+  "states": [
+    "default",
+    "hover",
+    "focus-visible",
+    "active",
+    "disabled",
+    "loading",
+    "empty",
+    "success",
+    "error",
+    "offline-fallback",
+    "local-storage-unavailable"
+  ],
+  "screenshotAssertions": [
+    "1440x900 explains input, output, and one primary action in the first viewport",
+    "768x1024 preserves search and result priority without overlap",
+    "390x844 has no horizontal overflow and keeps primary actions at least 44px",
+    "result state exposes access type before opening details",
+    "local shelf clearly states device-only storage"
+  ]
+}

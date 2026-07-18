@@ -1,0 +1,126 @@
+{
+  "schemaVersion": 1,
+  "slug": "isbn-book-lookup",
+  "name": "Shelfmark",
+  "owner": "DBL",
+  "mode": "light-api",
+  "user": {
+    "segment": "English-speaking readers looking for a legitimate way to access a known book",
+    "scenario": "They know a title, author, or ISBN and want a clear reading path within one minute"
+  },
+  "task": {
+    "verb": "find",
+    "description": "Find a legitimate download, borrow, preview, purchase, or local-library path for one book",
+    "frequency": "repeat"
+  },
+  "primaryInput": {
+    "name": "Book query",
+    "type": "title, author, or ISBN text",
+    "constraints": "1 to 160 characters; ISBN-10 and ISBN-13 checksums validated in ISBN mode"
+  },
+  "primaryOutput": {
+    "name": "Reading path result",
+    "format": "book record with source, access status, and direct actions",
+    "userAction": "Download a public-domain file, borrow, preview, buy, or save the record locally"
+  },
+  "distribution": {
+    "keywords": [
+      "find where to read a book",
+      "ISBN lookup",
+      "public domain epub",
+      "book preview",
+      "personal ebook library",
+      "open library search"
+    ],
+    "channels": [
+      "search",
+      "reader communities",
+      "ebook organization communities"
+    ]
+  },
+  "monetization": {
+    "strategy": "affiliate",
+    "paidSignal": "Users click legitimate purchase routes or repeatedly use local shelf and export features"
+  },
+  "data": {
+    "sources": [
+      {
+        "name": "Open Library Search and ISBN APIs",
+        "license": "Open Library terms and Internet Archive data policies",
+        "auth": "none",
+        "cors": "server-side adapter",
+        "quota": "fair use; cache and identify production traffic"
+      },
+      {
+        "name": "Google Books Volumes API",
+        "license": "Google Books API Terms of Service",
+        "auth": "optional server-side API key",
+        "cors": "server-side adapter",
+        "quota": "project quota and rate limits"
+      },
+      {
+        "name": "Gutendex and Project Gutenberg",
+        "license": "Gutendex GPL for software; Project Gutenberg terms and territorial copyright rules for content",
+        "auth": "none",
+        "cors": "server-side adapter",
+        "quota": "no SLA; self-host catalog for sustained traffic"
+      },
+      {
+        "name": "User-owned EPUB and PDF files",
+        "license": "user-provided content",
+        "auth": "none",
+        "cors": "not-applicable",
+        "quota": "50 MB per file in browser IndexedDB"
+      }
+    ],
+    "fallback": "Return successful sources, label unavailable sources, and keep local shelf features usable"
+  },
+  "metrics": {
+    "success": [
+      "search_succeeded",
+      "reading_path_clicked",
+      "shelf_item_saved",
+      "local_file_imported"
+    ],
+    "conversionEvents": [
+      "purchase_route_clicked",
+      "shelf_export_interest",
+      "bulk_isbn_interest"
+    ]
+  },
+  "stopConditions": [
+    {
+      "metric": "valid searches",
+      "threshold": "fewer than 50 in 14 days",
+      "windowDays": 14
+    },
+    {
+      "metric": "reading path clicks per 100 visitors",
+      "threshold": "fewer than 10",
+      "windowDays": 14
+    },
+    {
+      "metric": "local shelf saves or imports",
+      "threshold": "fewer than 5",
+      "windowDays": 14
+    }
+  ],
+  "scope": {
+    "mvp": [
+      "multi-source title, author, and ISBN search",
+      "explicit public-domain, borrow, preview, purchase, and metadata-only states",
+      "legitimate public-domain source actions",
+      "device-local saved book shelf",
+      "device-local EPUB and PDF import"
+    ],
+    "nonGoals": [
+      "accounts and cloud sync",
+      "community and team permissions",
+      "shadow libraries and DRM circumvention",
+      "subscription administration",
+      "hosting third-party public-domain bandwidth as a paid download service"
+    ]
+  },
+  "risk": "B",
+  "createdAt": "2026-07-18T00:00:00.000Z"
+}

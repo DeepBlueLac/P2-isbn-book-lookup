@@ -1,0 +1,16 @@
+{
+  "slug": "isbn-book-lookup",
+  "name": "Shelfmark",
+  "mode": "light-api",
+  "status": "Ralph 开发中",
+  "platforms": [
+    "web",
+    "android"
+  ],
+  "path": "C:\\Users\\Administrator\\Documents\\变成一个网站并部署\\products\\P2-isbn-book-lookup",
+  "github": null,
+  "webUrl": null,
+  "bundleId": "com.deepbluelac.isbnlookup",
+  "createdAt": "2026-07-18T00:00:00.000Z",
+  "updatedAt": "2026-07-18T00:00:00.000Z"
+}

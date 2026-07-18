@@ -1,0 +1,144 @@
+{
+  "schemaVersion": 1,
+  "product": "isbn-book-lookup",
+  "items": [
+    {
+      "id": "A-001",
+      "stage": "INTAKE",
+      "priority": "P0",
+      "description": "Product contracts exist and validate",
+      "observableAssertion": "compile-product reports every contract valid",
+      "testMethod": "audit",
+      "viewport": "not-applicable",
+      "evidenceRequired": "Factory DryRun JSON",
+      "status": "pending"
+    },
+    {
+      "id": "A-002",
+      "stage": "DESIGN",
+      "priority": "P0",
+      "description": "Shelfmark design prompt is product-specific",
+      "observableAssertion": "Design prompt has no placeholders and rejects copying P1 surface styling",
+      "testMethod": "audit",
+      "viewport": "not-applicable",
+      "evidenceRequired": "compile-product JSON and design prompt",
+      "status": "pending"
+    },
+    {
+      "id": "A-003",
+      "stage": "CORE",
+      "priority": "P0",
+      "description": "ISBN and access classification logic is framework independent",
+      "observableAssertion": "unit tests cover valid and invalid ISBN plus access priority",
+      "testMethod": "unit",
+      "viewport": "not-applicable",
+      "evidenceRequired": "Vitest output",
+      "status": "pending"
+    },
+    {
+      "id": "A-004",
+      "stage": "CORE",
+      "priority": "P0",
+      "description": "Search survives partial upstream failure",
+      "observableAssertion": "Open Library or Gutendex results remain usable without a Google key",
+      "testMethod": "integration",
+      "viewport": "not-applicable",
+      "evidenceRequired": "route tests and manual canary",
+      "status": "pending"
+    },
+    {
+      "id": "A-005",
+      "stage": "EXPERIENCE",
+      "priority": "P0",
+      "description": "Result exposes a legitimate reading path",
+      "observableAssertion": "each result labels public download, borrow, preview, purchase, or metadata-only before detail",
+      "testMethod": "playwright",
+      "viewport": "1440x900",
+      "evidenceRequired": "results screenshot and trace",
+      "status": "pending"
+    },
+    {
+      "id": "A-006",
+      "stage": "EXPERIENCE",
+      "priority": "P0",
+      "description": "Saved book shelf persists locally",
+      "observableAssertion": "save, reload, and remove preserve correct local shelf state",
+      "testMethod": "playwright",
+      "viewport": "390x844",
+      "evidenceRequired": "browser test output",
+      "status": "pending"
+    },
+    {
+      "id": "A-007",
+      "stage": "EXPERIENCE",
+      "priority": "P0",
+      "description": "User-owned files remain on device",
+      "observableAssertion": "EPUB/PDF up to 50 MB imports to IndexedDB and can be opened or exported",
+      "testMethod": "playwright",
+      "viewport": "768x1024",
+      "evidenceRequired": "file import test output",
+      "status": "pending"
+    },
+    {
+      "id": "A-008",
+      "stage": "POLISH",
+      "priority": "P0",
+      "description": "Desktop first viewport has one clear primary action",
+      "observableAssertion": "1440x900 shows product promise, search input, result promise, and Find this book CTA",
+      "testMethod": "screenshot",
+      "viewport": "1440x900",
+      "evidenceRequired": "desktop first-view screenshot",
+      "status": "pending"
+    },
+    {
+      "id": "A-009",
+      "stage": "POLISH",
+      "priority": "P0",
+      "description": "Mobile layout is usable",
+      "observableAssertion": "390x844 has no horizontal overflow and all primary controls are at least 44px",
+      "testMethod": "screenshot",
+      "viewport": "390x844",
+      "evidenceRequired": "mobile screenshot",
+      "status": "pending"
+    },
+    {
+      "id": "A-010",
+      "stage": "VERIFY",
+      "priority": "P0",
+      "description": "No secrets or user files are tracked",
+      "observableAssertion": "Factory and git audit find no env files, keys, signing files, or imported books",
+      "testMethod": "audit",
+      "viewport": "not-applicable",
+      "evidenceRequired": "audit report",
+      "status": "pending"
+    },
+    {
+      "id": "A-011",
+      "stage": "VERIFY",
+      "priority": "P0",
+      "description": "Full quality commands pass",
+      "observableAssertion": "check, test, and build commands return zero",
+      "testMethod": "integration",
+      "viewport": "not-applicable",
+      "evidenceRequired": "reports/quality/latest.json",
+      "status": "pending"
+    },
+    {
+      "id": "A-012",
+      "stage": "CANDIDATE",
+      "priority": "P1",
+      "description": "Release candidate remains human gated",
+      "observableAssertion": "candidate report includes commit, rollback, screenshots, and no automatic deployment",
+      "testMethod": "manual",
+      "viewport": "not-applicable",
+      "evidenceRequired": "candidate report",
+      "status": "pending"
+    }
+  ],
+  "qualityCommands": [
+    "npm run check",
+    "npm test",
+    "npm run build"
+  ],
+  "dryRunRequired": true
+}
