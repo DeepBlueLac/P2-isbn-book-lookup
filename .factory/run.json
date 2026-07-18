@@ -1,8 +1,8 @@
 {
     "schemaVersion":  1,
     "projectSlug":  "isbn-book-lookup",
-    "stage":  "CORE",
-    "iteration":  3,
+    "stage":  "EXPERIENCE",
+    "iteration":  4,
     "maxIterations":  {
                           "INTAKE":  2,
                           "DESIGN":  3,
@@ -29,7 +29,7 @@
                          "status":  "pass"
                      }
                  ],
-    "updatedAt":  "2026-07-18T06:47:00.6049481Z",
+    "updatedAt":  "2026-07-18T06:47:52.1596060Z",
     "history":  [
                     {
                         "stage":  "INTAKE",
@@ -53,6 +53,12 @@
                         "to":  "CORE",
                         "at":  "2026-07-18T06:47:00.6049481Z",
                         "reason":  "advanced-after:scaffold.audit"
+                    },
+                    {
+                        "from":  "CORE",
+                        "to":  "EXPERIENCE",
+                        "at":  "2026-07-18T06:47:52.1596060Z",
+                        "reason":  "advanced-after:core.tests"
                     }
                 ]
 }
