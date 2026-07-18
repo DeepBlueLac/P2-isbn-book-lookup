@@ -2,8 +2,17 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "书目 - ISBN 图书信息查询器",
-  description: "输入 ISBN，快速查询书籍封面、作者、出版社、出版日期与页数。无需登录。",
+  title: {
+    default: "Shelfmark — Find the book. Choose how to read it.",
+    template: "%s · Shelfmark",
+  },
+  description: "Search a title, author, or ISBN and find a legitimate download, borrow, preview, purchase, or local-shelf path.",
+  keywords: ["ISBN lookup", "where to read a book", "public domain epub", "book preview", "personal ebook library"],
+  openGraph: {
+    title: "Shelfmark — Find the book. Choose how to read it.",
+    description: "Access-first book search with transparent sources and a private device-only shelf.",
+    type: "website",
+  },
 };
 
 export default function RootLayout({
@@ -12,7 +21,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="zh-CN">
+    <html lang="en">
       <body>{children}</body>
     </html>
   );

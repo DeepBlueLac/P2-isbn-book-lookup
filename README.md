@@ -1,18 +1,20 @@
-# 书目
+# Shelfmark
 
-一个无需登录的图书搜索和公版电子书下载工具。支持书名、作者、Google Books 查询语法及 ISBN 精确查询。
+Find the book. Choose how to read it.
 
-## 功能
+Shelfmark is an access-first book search tool for readers who want a clear, legitimate next step: a public-domain download, a library borrow link, a publisher preview, a purchase route, or a device-only shelf record.
 
-- 书名、作者和 ISBN 搜索
-- 聚合 Google Books 与 Project Gutenberg 搜索结果
-- 只显示可直接下载的公版书
-- Google Books 和 Project Gutenberg 官方 EPUB/PDF 下载链接
-- 非公版图书的在线预览和购买入口
-- 封面、作者、出版社、日期、页数和简介
-- 复制书目信息
+## Features
 
-网站不会把受限预览伪装成免费下载。只有 Google Books 将条目标记为 `publicDomain` 且提供 `downloadLink`，或 Project Gutenberg 明确提供公版文件时，界面才显示下载按钮。
+- Search by title, author, or ISBN-10/ISBN-13
+- Merge Open Library, Project Gutenberg, and optional Google Books results
+- Label public-domain download, borrow, preview, purchase, and catalog-only states explicitly
+- Save records to a private browser shelf without an account
+- Import user-owned EPUB/PDF files into browser IndexedDB and reopen them locally
+- Copy a clean book summary for notes or catalog work
+- Barcode scanning on supported Capacitor Android builds
+
+The product never treats an access-limited preview as a free download. A download action is shown only when the upstream source explicitly supplies a public-domain file link.
 
 ## 本地运行
 
@@ -22,29 +24,34 @@ cp .env.example .env.local
 npm run dev
 ```
 
-在 `.env.local` 中配置：
+Configure `.env.local` when needed:
 
 ```text
-GOOGLE_BOOKS_API_KEY=...
+GOOGLE_BOOKS_API_KEY=optional_server_side_key
+NEXT_PUBLIC_SITE_URL=http://localhost:3000
 ```
 
-密钥仅由 Next.js Route Handler 使用，不会下发到浏览器。
+The Google key is read only by the Next.js Route Handler and is never sent to the browser. Open Library and Gutendex can work without it.
 
 ## 验证
 
 ```bash
-npm run lint
+npm run check
+npm test
 npm run build
 ```
 
-## 数据与隐私
+## Data and privacy
 
-- 元数据、预览、购买和部分公版下载链接来自 [Google Books API](https://developers.google.com/books/docs/v1/using)。
-- 公版书直链还来自 [Project Gutenberg](https://www.gutenberg.org/) 的 [Gutendex API](https://gutendex.com/)。
-- 项目不包含用户账户或数据库。
-- 查询结果和下载权限会受国家/地区、Google Books 收录情况及版权状态影响。
-- 请以图书版权页和 Google Books 的访问标记为准。
+- Metadata and legitimate destination links come from [Open Library](https://openlibrary.org/developers/api), [Google Books](https://developers.google.com/books/docs/v1/using), and [Gutendex](https://gutendex.com/).
+- Saved records use browser local storage. User EPUB/PDF files use browser IndexedDB and are not uploaded.
+- Availability varies by edition, country, and source policy. Users must check local copyright rules.
+- Source details and the product boundary are recorded in [docs/DATA-SOURCES.md](docs/DATA-SOURCES.md).
 
-## Z-Library 路径
+## Explicit non-goals
 
-本项目没有在网站中集成 Z-Library。相关技术验证见 [ZLIBRARY-FEASIBILITY.md](./docs/ZLIBRARY-FEASIBILITY.md)。
+- No Z-Library or shadow-library integration
+- No DRM circumvention or copyright-unclear file sources
+- No accounts, cloud sync, community, team permissions, or admin console
+
+The earlier Z-Library feasibility note is retained as an audit record in [docs/ZLIBRARY-FEASIBILITY.md](docs/ZLIBRARY-FEASIBILITY.md); it is not a product dependency.

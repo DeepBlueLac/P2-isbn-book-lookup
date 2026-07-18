@@ -1,47 +1,54 @@
 "use client";
 
 import {
+  ArrowLeft,
+  BookMarked,
   BookOpen,
   Check,
   ChevronRight,
+  CircleEllipsis,
   Copy,
   Download,
   ExternalLink,
+  Eye,
+  FileArchive,
   FileText,
-  Filter,
+  FolderOpen,
+  Library,
   LoaderCircle,
+  LockKeyhole,
   ScanLine,
   Search,
   ShieldCheck,
   ShoppingBag,
+  Trash2,
+  Upload,
   X,
 } from "lucide-react";
 import Image from "next/image";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, startTransition, useEffect, useMemo, useRef, useState } from "react";
 
-type BookResult = {
-  id: string;
-  source: "Google Books" | "Project Gutenberg";
-  title: string;
-  subtitle: string | null;
-  authors: string[];
-  publisher: string | null;
-  publishedDate: string | null;
-  description: string | null;
-  identifiers: { type?: string; identifier?: string }[];
-  pageCount: number | null;
-  categories: string[];
-  averageRating: number | null;
-  ratingsCount: number | null;
-  language: string | null;
-  cover: string | null;
-  previewLink: string | null;
-  infoLink: string | null;
-  publicDomain: boolean;
-  viewability: string;
-  downloads: { epub: string | null; pdf: string | null };
-  purchase: { link: string | null; amount: number | null; currency: string | null } | null;
-};
+import {
+  formatBookSummary,
+  getPrimaryAccess,
+  isValidIsbn,
+  normalizeIsbn,
+  type AccessKind,
+  type BookResult,
+  type SourceState,
+} from "@/core/books";
+import { trackProductEvent } from "@/platform/analytics";
+import {
+  getLocalBook,
+  importLocalBook,
+  listLocalBooks,
+  loadSavedBooks,
+  removeBookFromShelf,
+  removeLocalBook,
+  saveBookToShelf,
+  type LocalBookFile,
+  type SavedBook,
+} from "@/platform/local-library";
 
 type NativeBarcodePlugin = {
   isSupported?: () => Promise<{ supported: boolean }>;
@@ -58,87 +65,129 @@ declare global {
   }
 }
 
-const examples = {
-  isbn: [
-    { value: "9780140328721", label: "Matilda" },
-    { value: "9780439554930", label: "Harry Potter" },
-  ],
+const EXAMPLES = {
   search: [
-    { value: "Pride and Prejudice", label: "傲慢与偏见" },
-    { value: "鲁迅", label: "鲁迅" },
-    { value: "intitle:三体", label: "三体" },
+    { value: "Pride and Prejudice", label: "Pride and Prejudice" },
+    { value: "Octavia Butler", label: "Octavia Butler" },
+    { value: "The Martian", label: "The Martian" },
+  ],
+  isbn: [
+    { value: "9780140328721", label: "9780140328721" },
+    { value: "9780553418026", label: "9780553418026" },
   ],
 };
 
-function normalizeIsbn(value: string) {
-  return value.replace(/[^0-9Xx]/g, "").toUpperCase();
+const ACCESS_ORDER: AccessKind[] = ["public-domain", "borrow", "preview", "purchase", "metadata"];
+
+function AccessIcon({ kind, size = 16 }: { kind: AccessKind; size?: number }) {
+  if (kind === "public-domain") return <Download size={size} />;
+  if (kind === "borrow") return <Library size={size} />;
+  if (kind === "preview") return <Eye size={size} />;
+  if (kind === "purchase") return <ShoppingBag size={size} />;
+  return <CircleEllipsis size={size} />;
 }
 
-function isValidIsbn(value: string) {
-  if (/^\d{13}$/.test(value)) {
-    const sum = value.slice(0, 12).split("").reduce(
-      (total, digit, index) => total + Number(digit) * (index % 2 ? 3 : 1),
-      0,
-    );
-    return (10 - (sum % 10)) % 10 === Number(value[12]);
-  }
-  if (/^\d{9}[\dX]$/.test(value)) {
-    return value.split("").reduce((total, digit, index) => {
-      const number = digit === "X" ? 10 : Number(digit);
-      return total + number * (10 - index);
-    }, 0) % 11 === 0;
-  }
-  return false;
+function BookCover({ book, size = "row" }: { book: BookResult; size?: "row" | "detail" | "shelf" }) {
+  return (
+    <div className={`book-cover book-cover-${size}`}>
+      {book.cover ? (
+        <Image
+          src={book.cover}
+          alt={`${book.title} cover`}
+          fill
+          sizes={size === "detail" ? "(max-width: 720px) 180px, 260px" : "72px"}
+          unoptimized
+        />
+      ) : (
+        <div className="cover-missing" aria-label="Cover unavailable">
+          <BookOpen size={size === "detail" ? 34 : 20} />
+          {size === "detail" ? <span>{book.title}</span> : null}
+        </div>
+      )}
+    </div>
+  );
 }
 
-function hasDownload(book: BookResult) {
-  return Boolean(book.downloads.epub || book.downloads.pdf);
+function formatFileSize(bytes: number) {
+  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function formatDate(value: string) {
+  return new Intl.DateTimeFormat("en", { month: "short", day: "numeric", year: "numeric" }).format(new Date(value));
 }
 
 export function BookLookup() {
-  const [mode, setMode] = useState<"isbn" | "search">("search");
-  const [input, setInput] = useState("");
-  const [freeOnly, setFreeOnly] = useState(false);
+  const [view, setView] = useState<"find" | "shelf">("find");
+  const [mode, setMode] = useState<"search" | "isbn">("search");
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState<AccessKind | "all">("all");
   const [books, setBooks] = useState<BookResult[]>([]);
+  const [sources, setSources] = useState<SourceState[]>([]);
   const [selected, setSelected] = useState<BookResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const [searched, setSearched] = useState(false);
+  const [savedBooks, setSavedBooks] = useState<SavedBook[]>([]);
+  const [localFiles, setLocalFiles] = useState<LocalBookFile[]>([]);
+  const [localStorageError, setLocalStorageError] = useState("");
   const [copied, setCopied] = useState(false);
   const [nativeScanner, setNativeScanner] = useState(false);
   const [scanning, setScanning] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => {
+    const shelfTimer = window.setTimeout(() => {
+      setSavedBooks(loadSavedBooks());
       setNativeScanner(Boolean(window.Capacitor?.isNativePlatform?.() && window.Capacitor?.Plugins?.BarcodeScanner));
     }, 0);
-    return () => window.clearTimeout(timer);
+    void listLocalBooks().then(setLocalFiles).catch((reason: unknown) => {
+      setLocalStorageError(reason instanceof Error ? reason.message : "Local files are unavailable.");
+    });
+    return () => window.clearTimeout(shelfTimer);
   }, []);
 
-  const normalized = useMemo(() => normalizeIsbn(input), [input]);
-  const invalidIsbn = mode === "isbn" && Boolean(input) && !isValidIsbn(normalized);
+  useEffect(() => {
+    if (!notice) return;
+    const timer = window.setTimeout(() => setNotice(""), 2600);
+    return () => window.clearTimeout(timer);
+  }, [notice]);
 
-  function changeMode(next: "isbn" | "search") {
-    setMode(next);
-    setInput("");
-    setBooks([]);
+  const normalizedIsbn = useMemo(() => normalizeIsbn(query), [query]);
+  const invalidIsbn = mode === "isbn" && Boolean(query) && !isValidIsbn(normalizedIsbn);
+  const visibleBooks = useMemo(() => {
+    if (filter === "all") return books;
+    return books.filter((book) => getPrimaryAccess(book).kind === filter);
+  }, [books, filter]);
+  const savedIds = useMemo(() => new Set(savedBooks.map((item) => item.id)), [savedBooks]);
+
+  function switchView(next: "find" | "shelf") {
+    startTransition(() => setView(next));
     setSelected(null);
     setError("");
-    setSearched(false);
-    if (next === "isbn") setFreeOnly(false);
+    window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  async function lookup(value = input) {
-    const query = mode === "isbn" ? normalizeIsbn(value) : value.trim();
-    setInput(value);
+  function changeMode(next: "search" | "isbn") {
+    setMode(next);
+    setQuery("");
     setError("");
+    setFilter("all");
+  }
 
-    if (!query) {
-      setError("请输入书名、作者或 ISBN。");
+  async function lookup(value = query) {
+    const normalizedQuery = mode === "isbn" ? normalizeIsbn(value) : value.trim();
+    setQuery(value);
+    setError("");
+    setNotice("");
+    if (!normalizedQuery) {
+      setError("Enter a title, author, or ISBN to begin.");
       return;
     }
-    if (mode === "isbn" && !isValidIsbn(query)) {
-      setError("请输入有效的 ISBN-10 或 ISBN-13。横线和空格会自动忽略。");
+    if (mode === "isbn" && !isValidIsbn(normalizedQuery)) {
+      setError("Enter a valid ISBN-10 or ISBN-13. Spaces and hyphens are fine.");
       return;
     }
 
@@ -146,16 +195,26 @@ export function BookLookup() {
     setSearched(true);
     setSelected(null);
     try {
-      const params = new URLSearchParams({ q: query, mode, freeOnly: String(freeOnly) });
+      const params = new URLSearchParams({ q: normalizedQuery, mode });
       const response = await fetch(`/api/books/search?${params}`);
-      const data = (await response.json()) as { books?: BookResult[]; error?: string };
-      if (!response.ok) throw new Error(data.error || "查询失败");
-      const next = data.books || [];
-      setBooks(next);
-      if (mode === "isbn" && next.length) setSelected(next[0]);
+      const data = (await response.json()) as {
+        books?: BookResult[];
+        sources?: SourceState[];
+        partial?: boolean;
+        error?: string;
+      };
+      if (!response.ok) throw new Error(data.error || "The catalog could not complete this search.");
+      const nextBooks = data.books || [];
+      setBooks(nextBooks);
+      setSources(data.sources || []);
+      setFilter("all");
+      if (mode === "isbn" && nextBooks.length === 1) setSelected(nextBooks[0]);
+      if (data.partial) setNotice("Some catalogs were unavailable. Showing the sources that responded.");
+      trackProductEvent("search_succeeded", { mode, result_count: nextBooks.length, partial: Boolean(data.partial) });
     } catch (reason) {
       setBooks([]);
-      setError(reason instanceof Error ? reason.message : "查询服务暂时不可用");
+      setSources([]);
+      setError(reason instanceof Error ? reason.message : "Book search is temporarily unavailable.");
     } finally {
       setLoading(false);
     }
@@ -173,190 +232,502 @@ export function BookLookup() {
     setScanning(true);
     try {
       const support = await scanner.isSupported?.();
-      if (support && !support.supported) throw new Error("当前设备不支持条码扫描");
+      if (support && !support.supported) throw new Error("Barcode scanning is not supported on this device.");
       const permission = await scanner.requestPermissions?.();
       if (permission && !["granted", "limited"].includes(permission.camera)) {
-        throw new Error("需要相机权限才能扫描书籍条码");
+        throw new Error("Camera access is required to scan an ISBN.");
       }
       const result = await scanner.scan();
       const value = result.barcodes?.[0]?.rawValue || result.barcodes?.[0]?.displayValue;
-      if (!value) throw new Error("没有识别到 ISBN，请重新扫描");
+      if (!value) throw new Error("No ISBN was detected. Try again with the barcode centered.");
       const isbn = normalizeIsbn(value);
-      setInput(isbn);
+      setMode("isbn");
+      setQuery(isbn);
       await lookup(isbn);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "条码扫描失败");
+      setError(reason instanceof Error ? reason.message : "The barcode could not be scanned.");
     } finally {
       setScanning(false);
     }
   }
 
-  async function copySummary() {
-    if (!selected) return;
-    const isbn = selected.identifiers.find((item) => item.type?.startsWith("ISBN"))?.identifier;
-    await navigator.clipboard.writeText(
-      [selected.title, selected.authors.join("、"), selected.publisher, selected.publishedDate, isbn && `ISBN ${isbn}`]
-        .filter(Boolean)
-        .join("\n"),
-    );
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 1600);
+  async function copyBook(book: BookResult) {
+    try {
+      await navigator.clipboard.writeText(formatBookSummary(book));
+      setCopied(true);
+      setNotice("Book details copied.");
+      window.setTimeout(() => setCopied(false), 1600);
+      trackProductEvent("book_details_copied", { source: book.source });
+    } catch {
+      setError("Clipboard access is unavailable. Select and copy the details manually.");
+    }
   }
 
-  const visibleBooks = freeOnly ? books.filter(hasDownload) : books;
+  function toggleSavedBook(book: BookResult) {
+    try {
+      if (savedIds.has(book.id)) {
+        setSavedBooks(removeBookFromShelf(book.id));
+        setNotice("Removed from your shelf.");
+      } else {
+        setSavedBooks(saveBookToShelf(book));
+        setNotice("Saved to this device.");
+        trackProductEvent("shelf_item_saved", { source: book.source, access: getPrimaryAccess(book).kind });
+      }
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Your shelf could not be updated.");
+    }
+  }
+
+  function openReadingPath(book: BookResult, route: ReturnType<typeof getPrimaryAccess>) {
+    trackProductEvent("reading_path_clicked", { source: book.source, access: route.kind });
+    if (route.kind === "purchase") trackProductEvent("purchase_route_clicked", { source: book.source });
+  }
+
+  async function importFile(file: File | undefined) {
+    if (!file) return;
+    setImporting(true);
+    setError("");
+    try {
+      await importLocalBook(file);
+      setLocalFiles(await listLocalBooks());
+      setNotice(`${file.name} is now on this device.`);
+      trackProductEvent("local_file_imported", { type: file.name.toLowerCase().endsWith(".pdf") ? "pdf" : "epub" });
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "This file could not be imported.");
+    } finally {
+      setImporting(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }
+
+  async function openLocalFile(file: LocalBookFile, download = false) {
+    setError("");
+    try {
+      const record = await getLocalBook(file.id);
+      if (!record) throw new Error("This file is no longer available on this device.");
+      const url = URL.createObjectURL(record.blob);
+      if (download) {
+        const anchor = document.createElement("a");
+        anchor.href = url;
+        anchor.download = record.name;
+        anchor.click();
+      } else {
+        window.open(url, "_blank", "noopener,noreferrer");
+      }
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "This local file could not be opened.");
+    }
+  }
+
+  async function deleteLocalFile(id: string) {
+    try {
+      await removeLocalBook(id);
+      setLocalFiles((current) => current.filter((file) => file.id !== id));
+      setNotice("Local file removed.");
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "This local file could not be removed.");
+    }
+  }
 
   return (
-    <main className="shell">
+    <main className="app-shell">
       <header className="topbar">
-        <a className="brand" href="#top" aria-label="书目返回顶部">
-          <span className="brand-mark"><BookOpen size={20} /></span>
-          <span>书目</span>
-        </a>
-        <a className="source-link" href="https://books.google.com/" target="_blank" rel="noreferrer">
-          数据来源 Google Books <ExternalLink size={14} />
-        </a>
+        <button className="brand" type="button" onClick={() => switchView("find")} aria-label="Shelfmark home">
+          <span className="brand-glyph"><BookMarked size={21} /></span>
+          <span><strong>Shelfmark</strong><small>Find the book. Choose how to read it.</small></span>
+        </button>
+        <nav aria-label="Primary navigation">
+          <button className={view === "find" ? "active" : ""} type="button" onClick={() => switchView("find")}>
+            <Search size={16} /> Find
+          </button>
+          <button className={view === "shelf" ? "active" : ""} type="button" onClick={() => switchView("shelf")}>
+            <Library size={16} /> My shelf <span className="nav-count">{savedBooks.length + localFiles.length}</span>
+          </button>
+        </nav>
+        <a className="transparency-link" href="#data-notice"><ShieldCheck size={15} /> Source transparent</a>
       </header>
 
-      <section className="workspace" id="top">
-        <div className="intro">
-          <h1>找到一本书，也找到阅读它的方式。</h1>
-          <p>按书名、作者或 ISBN 搜索。公版书可直接下载官方 EPUB/PDF，其他书籍提供在线预览或购买入口。</p>
-        </div>
+      {view === "find" ? (
+        <div className="find-view">
+          {!searched ? (
+            <section className="hero" aria-labelledby="hero-title">
+              <div className="hero-copy">
+                <p className="eyebrow"><span>01</span> Access-first book search</p>
+                <h1 id="hero-title">One book.<br /><em>Every legitimate way in.</em></h1>
+                <p className="hero-description">
+                  Search a title, author, or ISBN. Shelfmark separates public-domain downloads, library borrowing,
+                  previews, and purchase routes—without pretending a catalog record is a free ebook.
+                </p>
+                <SearchPanel
+                  mode={mode}
+                  query={query}
+                  loading={loading}
+                  invalidIsbn={invalidIsbn}
+                  nativeScanner={nativeScanner}
+                  scanning={scanning}
+                  onModeChange={changeMode}
+                  onQueryChange={setQuery}
+                  onSubmit={submit}
+                  onExample={(value) => void lookup(value)}
+                  onScan={() => void scanIsbn()}
+                />
+                {error ? <ErrorMessage message={error} /> : null}
+                {notice ? <NoticeMessage message={notice} /> : null}
+              </div>
 
-        <div className="mode-switch" role="tablist" aria-label="查询方式">
-          <button className={mode === "search" ? "active" : ""} onClick={() => changeMode("search")} role="tab" aria-selected={mode === "search"}>书名 / 作者</button>
-          <button className={mode === "isbn" ? "active" : ""} onClick={() => changeMode("isbn")} role="tab" aria-selected={mode === "isbn"}>ISBN 精确查询</button>
-        </div>
-
-        <form className="search-form" onSubmit={submit}>
-          <label htmlFor="book-query">{mode === "isbn" ? "ISBN-10 或 ISBN-13" : "书名、作者或 Google Books 查询语法"}</label>
-          <div className={`search-box ${invalidIsbn ? "invalid" : ""}`}>
-            <Search size={21} aria-hidden="true" />
-            <input
-              id="book-query"
-              value={input}
-              onChange={(event) => setInput(event.target.value)}
-              placeholder={mode === "isbn" ? "例如 9780140328721" : "例如：傲慢与偏见、鲁迅、intitle:三体"}
-              autoComplete="off"
-              inputMode={mode === "isbn" ? "text" : "search"}
-            />
-            {input && <button className="clear-button" type="button" onClick={() => setInput("")} aria-label="清空查询"><X size={18} /></button>}
-            <button className="search-button" type="submit" disabled={loading}>
-              {loading ? <LoaderCircle className="spin" size={18} /> : <Search size={18} />}
-              搜索图书
-            </button>
-          </div>
-
-          <div className="search-options">
-            <div className="examples" aria-label="示例查询">
-              <span>试试：</span>
-              {examples[mode].map((example) => (
-                <button type="button" key={example.value} onClick={() => void lookup(example.value)}>{example.label}</button>
-              ))}
-              {mode === "isbn" && nativeScanner && (
-                <button className="scan-button" type="button" disabled={scanning} onClick={() => void scanIsbn()}>
-                  {scanning ? <LoaderCircle className="spin" size={14} /> : <ScanLine size={14} />} 扫描条码
+              <aside className="route-ledger" aria-label="Reading paths">
+                <div className="ledger-heading"><span>READING PATHS</span><small>ranked by usefulness</small></div>
+                <ol>
+                  <li><span className="ledger-index">A</span><Download size={18} /><div><strong>Download</strong><small>Verified public-domain EPUB or PDF</small></div></li>
+                  <li><span className="ledger-index">B</span><Library size={18} /><div><strong>Borrow</strong><small>Availability confirmed by the source library</small></div></li>
+                  <li><span className="ledger-index">C</span><Eye size={18} /><div><strong>Preview</strong><small>Read the pages a publisher has made available</small></div></li>
+                  <li><span className="ledger-index">D</span><ShoppingBag size={18} /><div><strong>Purchase</strong><small>Go to a legitimate seller when offered</small></div></li>
+                </ol>
+                <button className="shelf-summary" type="button" onClick={() => switchView("shelf")}>
+                  <span><Library size={18} /><strong>Your private shelf</strong></span>
+                  <span>{savedBooks.length + localFiles.length} items <ChevronRight size={17} /></span>
                 </button>
-              )}
-            </div>
-            {mode === "search" && (
-              <label className="free-filter">
-                <input type="checkbox" checked={freeOnly} onChange={(event) => setFreeOnly(event.target.checked)} />
-                <Filter size={14} /> 只看可下载
-              </label>
-            )}
-          </div>
-        </form>
+              </aside>
+            </section>
+          ) : null}
 
-        {error && <div className="message error-message">{error}</div>}
-
-        {!searched && !error && (
-          <section className="empty-state">
-            <div className="book-stack" aria-hidden="true"><span /><span /><span /></div>
-            <div>
-              <h2>从一个关键词开始</h2>
-              <p>搜索结果会明确区分“直接下载”“在线预览”和“购买”，不会把受限预览伪装成免费下载。</p>
-            </div>
-          </section>
-        )}
-
-        {loading && <section className="loading-state" aria-live="polite"><LoaderCircle className="spin" size={26} /><span>正在检索 Google Books…</span></section>}
-
-        {!loading && searched && !error && visibleBooks.length === 0 && (
-          <div className="no-results"><BookOpen size={30} /><h2>没有找到符合条件的书</h2><p>尝试缩短关键词、改用作者名，或关闭“只看可下载”。</p></div>
-        )}
-
-        {!loading && visibleBooks.length > 0 && !selected && (
-          <section className="results-section">
-            <div className="results-heading"><h2>搜索结果</h2><span>{visibleBooks.length} 条</span></div>
-            <div className="result-list">
-              {visibleBooks.map((book) => (
-                <button className="result-row" key={book.id} type="button" onClick={() => setSelected(book)}>
-                  <div className="row-cover">
-                    {book.cover ? <Image src={book.cover} alt="" fill sizes="64px" unoptimized /> : <BookOpen size={23} />}
-                  </div>
-                  <div className="row-copy">
-                    <div className="row-title-line">
-                      <h3>{book.title}</h3>
-                      {hasDownload(book) && <span className="downloadable"><Download size={12} /> 可下载</span>}
-                    </div>
-                    <p>{book.authors.join("、") || "作者未知"}</p>
-                    <small>{[book.source, book.publisher, book.publishedDate, book.language?.toUpperCase()].filter(Boolean).join(" · ")}</small>
-                  </div>
-                  <ChevronRight size={20} />
+          {searched ? (
+            <section className="catalog-workspace">
+              <div className="compact-search-row">
+                <button className="compact-brand" type="button" onClick={() => { setSearched(false); setBooks([]); setSelected(null); }}>
+                  <ArrowLeft size={17} /> New search
                 </button>
-              ))}
-            </div>
-          </section>
-        )}
+                <SearchPanel
+                  compact
+                  mode={mode}
+                  query={query}
+                  loading={loading}
+                  invalidIsbn={invalidIsbn}
+                  nativeScanner={nativeScanner}
+                  scanning={scanning}
+                  onModeChange={changeMode}
+                  onQueryChange={setQuery}
+                  onSubmit={submit}
+                  onExample={(value) => void lookup(value)}
+                  onScan={() => void scanIsbn()}
+                />
+              </div>
+              {error ? <ErrorMessage message={error} /> : null}
+              {notice ? <NoticeMessage message={notice} /> : null}
+              {loading ? <LoadingState /> : null}
+              {!loading && selected ? (
+                <BookDetail
+                  book={selected}
+                  saved={savedIds.has(selected.id)}
+                  copied={copied}
+                  onBack={() => setSelected(null)}
+                  onCopy={() => void copyBook(selected)}
+                  onSave={() => toggleSavedBook(selected)}
+                  onReadingPath={openReadingPath}
+                />
+              ) : null}
+              {!loading && !selected ? (
+                <BookResults
+                  books={books}
+                  visibleBooks={visibleBooks}
+                  sources={sources}
+                  filter={filter}
+                  savedIds={savedIds}
+                  onFilter={setFilter}
+                  onSelect={setSelected}
+                  onSave={toggleSavedBook}
+                  onReadingPath={openReadingPath}
+                />
+              ) : null}
+            </section>
+          ) : null}
+        </div>
+      ) : (
+        <ShelfView
+          savedBooks={savedBooks}
+          localFiles={localFiles}
+          localStorageError={localStorageError}
+          error={error}
+          notice={notice}
+          importing={importing}
+          fileInputRef={fileInputRef}
+          onFind={() => switchView("find")}
+          onSelect={(book) => { setSelected(book); setBooks([book]); setSearched(true); switchView("find"); window.setTimeout(() => setSelected(book), 0); }}
+          onRemoveSaved={(id) => setSavedBooks(removeBookFromShelf(id))}
+          onImport={(file) => void importFile(file)}
+          onOpen={(file, download) => void openLocalFile(file, download)}
+          onDelete={(id) => void deleteLocalFile(id)}
+        />
+      )}
 
-        {selected && <BookDetail book={selected} copied={copied} onCopy={copySummary} onBack={() => setSelected(null)} />}
-      </section>
-
-      <footer>下载按钮仅展示 Google Books 或 Project Gutenberg 明确提供的公版官方下载链接。</footer>
+      <footer id="data-notice">
+        <div><strong>Shelfmark</strong><span>Open Library · Google Books · Project Gutenberg</span></div>
+        <p>Availability varies by edition and region. Local shelf files stay in this browser and are never uploaded.</p>
+        <a href="https://github.com/DeepBlueLac/isbn-book-lookup" target="_blank" rel="noreferrer">Data & source notes <ExternalLink size={14} /></a>
+      </footer>
     </main>
   );
 }
 
-function BookDetail({ book, copied, onCopy, onBack }: { book: BookResult; copied: boolean; onCopy: () => void; onBack: () => void }) {
-  const isbn = book.identifiers.find((item) => item.type === "ISBN_13")?.identifier || book.identifiers.find((item) => item.type === "ISBN_10")?.identifier;
+type SearchPanelProps = {
+  compact?: boolean;
+  mode: "search" | "isbn";
+  query: string;
+  loading: boolean;
+  invalidIsbn: boolean;
+  nativeScanner: boolean;
+  scanning: boolean;
+  onModeChange: (mode: "search" | "isbn") => void;
+  onQueryChange: (value: string) => void;
+  onSubmit: (event: FormEvent) => void;
+  onExample: (value: string) => void;
+  onScan: () => void;
+};
+
+function SearchPanel(props: SearchPanelProps) {
   return (
-    <section className="result detail-result" aria-live="polite">
-      <button className="back-button" type="button" onClick={onBack}>返回搜索结果</button>
-      <div className="cover-wrap">
-        {book.cover ? <Image src={book.cover} alt={`${book.title} 封面`} width={280} height={420} className="cover" unoptimized /> : <div className="cover-fallback"><BookOpen size={42} /><span>暂无封面</span></div>}
+    <form className={`search-panel ${props.compact ? "search-panel-compact" : ""}`} onSubmit={props.onSubmit}>
+      <div className="search-mode" role="tablist" aria-label="Search mode">
+        <button className={props.mode === "search" ? "active" : ""} type="button" role="tab" aria-selected={props.mode === "search"} onClick={() => props.onModeChange("search")}>Title or author</button>
+        <button className={props.mode === "isbn" ? "active" : ""} type="button" role="tab" aria-selected={props.mode === "isbn"} onClick={() => props.onModeChange("isbn")}>ISBN</button>
       </div>
-      <div className="book-info">
-        <div className="result-heading">
-          <div>
-            <span className={`access-label ${hasDownload(book) ? "available" : "preview"}`}>
-              {hasDownload(book) ? <><ShieldCheck size={15} /> {book.source} 公版可下载</> : <><FileText size={15} /> {book.previewLink ? "可在线预览" : "仅书目信息"}</>}
-            </span>
-            <h2>{book.title}</h2>
-            {book.subtitle && <p className="subtitle">{book.subtitle}</p>}
+      <label htmlFor={props.compact ? "compact-book-query" : "book-query"}>
+        {props.mode === "isbn" ? "ISBN-10 or ISBN-13" : "Book title or author"}
+      </label>
+      <div className={`search-input ${props.invalidIsbn ? "invalid" : ""}`}>
+        <Search size={20} aria-hidden="true" />
+        <input
+          id={props.compact ? "compact-book-query" : "book-query"}
+          value={props.query}
+          onChange={(event) => props.onQueryChange(event.target.value)}
+          placeholder={props.mode === "isbn" ? "9780553418026" : "Try The Martian or Andy Weir"}
+          autoComplete="off"
+          inputMode={props.mode === "isbn" ? "text" : "search"}
+          aria-invalid={props.invalidIsbn}
+        />
+        {props.query ? <button className="clear-query" type="button" onClick={() => props.onQueryChange("")} aria-label="Clear search"><X size={18} /></button> : null}
+        <button className="find-button" type="submit" disabled={props.loading || props.invalidIsbn}>
+          {props.loading ? <LoaderCircle className="spin" size={18} /> : <Search size={18} />}
+          Find this book
+        </button>
+      </div>
+      {!props.compact ? (
+        <div className="search-examples">
+          <span>Try</span>
+          {EXAMPLES[props.mode].map((example) => (
+            <button key={example.value} type="button" onClick={() => props.onExample(example.value)}>{example.label}</button>
+          ))}
+          {props.mode === "isbn" && props.nativeScanner ? (
+            <button type="button" disabled={props.scanning} onClick={props.onScan}>
+              {props.scanning ? <LoaderCircle className="spin" size={13} /> : <ScanLine size={13} />} Scan a barcode
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+    </form>
+  );
+}
+
+function BookResults({
+  books,
+  visibleBooks,
+  sources,
+  filter,
+  savedIds,
+  onFilter,
+  onSelect,
+  onSave,
+  onReadingPath,
+}: {
+  books: BookResult[];
+  visibleBooks: BookResult[];
+  sources: SourceState[];
+  filter: AccessKind | "all";
+  savedIds: Set<string>;
+  onFilter: (filter: AccessKind | "all") => void;
+  onSelect: (book: BookResult) => void;
+  onSave: (book: BookResult) => void;
+  onReadingPath: (book: BookResult, route: ReturnType<typeof getPrimaryAccess>) => void;
+}) {
+  const availableFilters = ACCESS_ORDER.filter((kind) => books.some((book) => getPrimaryAccess(book).kind === kind));
+  return (
+    <div className="results-layout">
+      <section className="results-main" aria-live="polite">
+        <div className="results-toolbar">
+          <div><p className="eyebrow"><span>02</span> Catalog results</p><h2>{books.length} editions and works</h2></div>
+          <div className="access-filters" aria-label="Filter by access">
+            <button className={filter === "all" ? "active" : ""} type="button" onClick={() => onFilter("all")}>All</button>
+            {availableFilters.map((kind) => <button className={filter === kind ? "active" : ""} key={kind} type="button" onClick={() => onFilter(kind)}>{getFilterLabel(kind)}</button>)}
           </div>
-          <button className="copy-button" type="button" onClick={onCopy}>{copied ? <Check size={18} /> : <Copy size={18} />}{copied ? "已复制" : "复制信息"}</button>
         </div>
+        {visibleBooks.length ? (
+          <div className="book-list">
+            {visibleBooks.map((book) => {
+              const route = getPrimaryAccess(book);
+              return (
+                <article className="book-row" key={book.id}>
+                  <BookCover book={book} />
+                  <div className="book-row-copy">
+                    <span className={`access-badge access-${route.kind}`}><AccessIcon kind={route.kind} size={13} />{route.label}</span>
+                    <h3>{book.title}</h3>
+                    <p>{book.authors.join(", ") || "Author not listed"}</p>
+                    <small>{[book.source, book.publishedDate, book.language?.toUpperCase()].filter(Boolean).join(" · ")}</small>
+                  </div>
+                  <div className="book-row-actions">
+                    {route.href ? (
+                      <a className="route-button" href={route.href} target="_blank" rel="noreferrer" onClick={() => onReadingPath(book, route)}>
+                        {route.actionLabel} <ExternalLink size={14} />
+                      </a>
+                    ) : null}
+                    <div>
+                      <button type="button" onClick={() => onSelect(book)}>Details</button>
+                      <button className={savedIds.has(book.id) ? "saved" : ""} type="button" onClick={() => onSave(book)} aria-label={savedIds.has(book.id) ? "Remove from shelf" : "Save to shelf"}>
+                        {savedIds.has(book.id) ? <Check size={16} /> : <BookMarked size={16} />}
+                      </button>
+                    </div>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="empty-results"><BookOpen size={30} /><h3>No books match this access filter.</h3><p>Try all results or search with fewer words.</p></div>
+        )}
+      </section>
+      <aside className="source-rail">
+        <p className="rail-label">SOURCE CHECK</p>
+        {sources.map((source) => (
+          <div className="source-state" key={source.source}>
+            <span className={`state-dot state-${source.status}`} />
+            <div><strong>{source.source}</strong><small>{source.status === "available" ? source.detail : source.status === "skipped" ? "Not configured for this search" : "Temporarily unavailable"}</small></div>
+          </div>
+        ))}
+        <p>Results are merged, then deduplicated by ISBN or title and author. Availability can still vary by region.</p>
+      </aside>
+    </div>
+  );
+}
 
-        <div className="primary-actions">
-          {book.downloads.epub && <a className="download-action" href={book.downloads.epub} target="_blank" rel="noreferrer"><Download size={18} /> 下载 EPUB</a>}
-          {book.downloads.pdf && <a className="download-action" href={book.downloads.pdf} target="_blank" rel="noreferrer"><Download size={18} /> 下载 PDF</a>}
-          {book.previewLink && <a className="secondary-action" href={book.previewLink} target="_blank" rel="noreferrer"><BookOpen size={18} /> 在线预览</a>}
-          {book.purchase?.link && <a className="secondary-action" href={book.purchase.link} target="_blank" rel="noreferrer"><ShoppingBag size={18} /> 购买{book.purchase.amount ? ` ${book.purchase.amount} ${book.purchase.currency}` : ""}</a>}
+function BookDetail({ book, saved, copied, onBack, onCopy, onSave, onReadingPath }: {
+  book: BookResult;
+  saved: boolean;
+  copied: boolean;
+  onBack: () => void;
+  onCopy: () => void;
+  onSave: () => void;
+  onReadingPath: (book: BookResult, route: ReturnType<typeof getPrimaryAccess>) => void;
+}) {
+  const route = getPrimaryAccess(book);
+  const isbn = book.identifiers.find((item) => item.type === "ISBN_13")?.identifier || book.identifiers.find((item) => item.type === "ISBN_10")?.identifier;
+  const actions = [
+    { href: book.links.epub, label: "Download EPUB", icon: Download, kind: "public-domain" as AccessKind },
+    { href: book.links.pdf, label: "Download PDF", icon: Download, kind: "public-domain" as AccessKind },
+    { href: book.links.borrow, label: "Check library", icon: Library, kind: "borrow" as AccessKind },
+    { href: book.links.preview, label: "Open preview", icon: Eye, kind: "preview" as AccessKind },
+    { href: book.links.purchase, label: book.purchase?.amount ? `Buy · ${book.purchase.amount} ${book.purchase.currency || ""}` : "View purchase", icon: ShoppingBag, kind: "purchase" as AccessKind },
+  ].filter((action): action is { href: string; label: string; icon: typeof Download; kind: AccessKind } => Boolean(action.href));
+
+  return (
+    <section className="book-detail" aria-live="polite">
+      <button className="detail-back" type="button" onClick={onBack}><ArrowLeft size={17} /> Back to results</button>
+      <div className="detail-grid">
+        <div className="detail-cover-column"><BookCover book={book} size="detail" /><span>{book.source}</span></div>
+        <div className="detail-copy">
+          <span className={`access-badge access-${route.kind}`}><AccessIcon kind={route.kind} size={14} />{route.label}</span>
+          <h2>{book.title}</h2>
+          {book.subtitle ? <p className="detail-subtitle">{book.subtitle}</p> : null}
+          <p className="detail-author">{book.authors.length ? `By ${book.authors.join(", ")}` : "Author not listed"}</p>
+          <div className="detail-actions">
+            {actions.map((action, index) => {
+              const Icon = action.icon;
+              return <a className={index === 0 ? "primary" : "secondary"} key={`${action.kind}-${action.href}`} href={action.href} target="_blank" rel="noreferrer" onClick={() => onReadingPath(book, { ...route, kind: action.kind, href: action.href, actionLabel: action.label })}><Icon size={17} />{action.label}<ExternalLink size={13} /></a>;
+            })}
+            <button className={saved ? "saved" : ""} type="button" onClick={onSave}>{saved ? <Check size={17} /> : <BookMarked size={17} />}{saved ? "On your shelf" : "Save to shelf"}</button>
+            <button type="button" onClick={onCopy}>{copied ? <Check size={17} /> : <Copy size={17} />}{copied ? "Copied" : "Copy details"}</button>
+          </div>
+          <dl className="book-metadata">
+            <div><dt>Publisher</dt><dd>{book.publisher || "Not listed"}</dd></div>
+            <div><dt>Published</dt><dd>{book.publishedDate || "Not listed"}</dd></div>
+            <div><dt>Pages</dt><dd>{book.pageCount ? book.pageCount.toLocaleString() : "Not listed"}</dd></div>
+            <div><dt>Language</dt><dd>{book.language?.toUpperCase() || "Not listed"}</dd></div>
+            <div><dt>ISBN</dt><dd className="mono">{isbn || "Not listed"}</dd></div>
+          </dl>
+          {book.description ? <p className="book-description">{book.description}</p> : null}
+          {book.categories.length ? <div className="subjects">{book.categories.slice(0, 6).map((category) => <span key={category}>{category}</span>)}</div> : null}
+          {book.links.info ? <a className="source-record-link" href={book.links.info} target="_blank" rel="noreferrer">View the source record <ExternalLink size={14} /></a> : null}
         </div>
-
-        <dl className="metadata">
-          <div><dt>作者</dt><dd>{book.authors.join("、") || "未提供"}</dd></div>
-          <div><dt>出版社</dt><dd>{book.publisher || "未提供"}</dd></div>
-          <div><dt>出版日期</dt><dd>{book.publishedDate || "未提供"}</dd></div>
-          <div><dt>页数</dt><dd>{book.pageCount ? `${book.pageCount} 页` : "未提供"}</dd></div>
-          <div><dt>ISBN</dt><dd className="mono">{isbn || "未提供"}</dd></div>
-        </dl>
-
-        {book.description && <p className="description">{book.description}</p>}
-        {book.categories.length > 0 && <div className="subjects">{book.categories.slice(0, 6).map((category) => <span key={category}>{category}</span>)}</div>}
-        {book.infoLink && <a className="detail-link" href={book.infoLink} target="_blank" rel="noreferrer">在 {book.source} 查看完整记录 <ExternalLink size={15} /></a>}
       </div>
     </section>
   );
+}
+
+function ShelfView({ savedBooks, localFiles, localStorageError, error, notice, importing, fileInputRef, onFind, onSelect, onRemoveSaved, onImport, onOpen, onDelete }: {
+  savedBooks: SavedBook[];
+  localFiles: LocalBookFile[];
+  localStorageError: string;
+  error: string;
+  notice: string;
+  importing: boolean;
+  fileInputRef: React.RefObject<HTMLInputElement | null>;
+  onFind: () => void;
+  onSelect: (book: BookResult) => void;
+  onRemoveSaved: (id: string) => void;
+  onImport: (file: File | undefined) => void;
+  onOpen: (file: LocalBookFile, download: boolean) => void;
+  onDelete: (id: string) => void;
+}) {
+  return (
+    <section className="shelf-view">
+      <div className="shelf-hero">
+        <div><p className="eyebrow"><span>MY</span> Device-only library</p><h1>A quiet shelf that stays <em>with you.</em></h1><p>Save catalog records or keep your own EPUB and PDF files in this browser. No account, upload, or reading-history profile.</p></div>
+        <div className="privacy-stamp"><LockKeyhole size={22} /><strong>Stored on this device</strong><span>Clearing browser data removes this shelf.</span></div>
+      </div>
+      {error ? <ErrorMessage message={error} /> : null}
+      {notice ? <NoticeMessage message={notice} /> : null}
+      <div className="shelf-grid">
+        <section className="saved-section">
+          <div className="section-heading"><div><span>01</span><div><h2>Saved records</h2><p>{savedBooks.length} catalog {savedBooks.length === 1 ? "entry" : "entries"}</p></div></div><button type="button" onClick={onFind}><Search size={15} /> Find a book</button></div>
+          {savedBooks.length ? <div className="saved-list">{savedBooks.map((item) => {
+            const route = getPrimaryAccess(item.book);
+            return <article key={item.id}><button className="saved-book-main" type="button" onClick={() => onSelect(item.book)}><BookCover book={item.book} size="shelf" /><span><small>{route.label}</small><strong>{item.book.title}</strong><em>{item.book.authors.join(", ") || "Author not listed"}</em></span><ChevronRight size={18} /></button><button className="remove-icon" type="button" onClick={() => onRemoveSaved(item.id)} aria-label={`Remove ${item.book.title}`}><Trash2 size={16} /></button></article>;
+          })}</div> : <div className="shelf-empty"><BookMarked size={28} /><h3>No saved records yet.</h3><p>Use Shelfmark to find a book, then save the edition or work you want to remember.</p><button type="button" onClick={onFind}>Find your first book</button></div>}
+        </section>
+        <section className="local-section">
+          <div className="section-heading"><div><span>02</span><div><h2>Your EPUB & PDF files</h2><p>{localFiles.length} local {localFiles.length === 1 ? "file" : "files"}</p></div></div></div>
+          <input ref={fileInputRef} type="file" accept=".epub,.pdf,application/epub+zip,application/pdf" hidden onChange={(event) => onImport(event.target.files?.[0])} />
+          <button className="import-dropzone" type="button" disabled={importing} onClick={() => fileInputRef.current?.click()}>
+            {importing ? <LoaderCircle className="spin" size={25} /> : <Upload size={25} />}
+            <span><strong>{importing ? "Saving to this device…" : "Import a book you own"}</strong><small>EPUB or PDF · up to 50 MB · never uploaded</small></span>
+          </button>
+          {localStorageError ? <div className="storage-warning"><FileText size={18} /><span><strong>Local file storage is unavailable.</strong>{localStorageError}</span></div> : null}
+          {localFiles.length ? <div className="local-files">{localFiles.map((file) => <article key={file.id}>
+            <span className="file-type">{file.type === "application/pdf" ? <FileText size={19} /> : <FileArchive size={19} />}{file.type === "application/pdf" ? "PDF" : "EPUB"}</span>
+            <div><strong>{file.name}</strong><small>{formatFileSize(file.size)} · Added {formatDate(file.addedAt)}</small></div>
+            <div className="file-actions"><button type="button" onClick={() => onOpen(file, false)}><FolderOpen size={15} /> Open</button><button type="button" onClick={() => onOpen(file, true)} aria-label={`Download ${file.name}`}><Download size={15} /></button><button type="button" onClick={() => onDelete(file.id)} aria-label={`Delete ${file.name}`}><Trash2 size={15} /></button></div>
+          </article>)}</div> : null}
+        </section>
+      </div>
+    </section>
+  );
+}
+
+function LoadingState() {
+  return <div className="loading-state" aria-live="polite"><LoaderCircle className="spin" size={24} /><div><strong>Checking three catalogs</strong><span>Looking for editions, borrowing, previews, and public-domain files.</span></div></div>;
+}
+
+function ErrorMessage({ message }: { message: string }) {
+  return <div className="message error-message" role="alert"><X size={18} /><span><strong>That search needs another try.</strong>{message}</span></div>;
+}
+
+function NoticeMessage({ message }: { message: string }) {
+  return <div className="message notice-message" role="status"><Check size={18} /><span>{message}</span></div>;
+}
+
+function getFilterLabel(kind: AccessKind) {
+  if (kind === "public-domain") return "Download";
+  if (kind === "borrow") return "Borrow";
+  if (kind === "preview") return "Preview";
+  if (kind === "purchase") return "Purchase";
+  return "Record only";
 }
