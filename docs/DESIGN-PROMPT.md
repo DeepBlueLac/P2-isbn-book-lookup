@@ -1,5 +1,9 @@
 # Shelfmark 产品专属设计 Prompt
 
+## Locked direction after visual selection
+
+以 `Reading Portal + Infinite Index` 为唯一实现目标：左侧使用沉浸式书页门户作为视觉世界，右侧使用选中书籍与编号阅读路径作为决策结构。桌面端要像一张完整的电影感产品界面，而不是卡片化 SaaS 仪表盘；移动端优先保留品牌、搜索、封面和合法路径。允许使用独立生图资产、Motion/CSS 视差与按需加载，但不得把整张设计图当成背景，也不得用 CSS/伪 SVG 绘制书页、封面或品牌标记。
+
 ## Design Read
 
 - 产品类型：Hybrid 工具网站。

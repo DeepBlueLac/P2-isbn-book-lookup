@@ -19,7 +19,6 @@ import {
   LockKeyhole,
   ScanLine,
   Search,
-  ShieldCheck,
   ShoppingBag,
   Trash2,
   Upload,
@@ -27,6 +26,7 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import { FormEvent, startTransition, useEffect, useMemo, useRef, useState } from "react";
+import { ArrowUpRight, BookOpenText, BookmarkSimple, Eye as PhosphorEye, ShieldCheck as PhosphorShieldCheck, ShoppingBagOpen } from "@phosphor-icons/react";
 
 import {
   formatBookSummary,
@@ -75,6 +75,34 @@ const EXAMPLES = {
     { value: "9780140328721", label: "9780140328721" },
     { value: "9780553418026", label: "9780553418026" },
   ],
+};
+
+const DEMO_BOOK: BookResult = {
+  id: "shelfmark-demo-the-martian",
+  source: "Google Books",
+  title: "The Martian",
+  subtitle: "A Novel",
+  authors: ["Andy Weir"],
+  publisher: "Crown Publishing Group",
+  publishedDate: "2014",
+  description: "A stranded astronaut must rely on ingenuity and unshakeable determination to survive.",
+  identifiers: [{ type: "ISBN_13", identifier: "9780553418026" }],
+  pageCount: 387,
+  categories: ["Science fiction", "Adventure"],
+  averageRating: null,
+  ratingsCount: null,
+  language: "en",
+  cover: "/media/the-martian-cover.webp",
+  publicDomain: false,
+  links: {
+    epub: null,
+    pdf: null,
+    borrow: "https://openlibrary.org/isbn/9780553418026",
+    preview: "https://books.google.com/books?vid=ISBN9780553418026",
+    purchase: "https://books.google.com/books?vid=ISBN9780553418026",
+    info: "https://books.google.com/books?vid=ISBN9780553418026",
+  },
+  purchase: null,
 };
 
 const ACCESS_ORDER: AccessKind[] = ["public-domain", "borrow", "preview", "purchase", "metadata"];
@@ -334,7 +362,7 @@ export function BookLookup() {
     <main className="app-shell">
       <header className="topbar">
         <button className="brand" type="button" onClick={() => switchView("find")} aria-label="Shelfmark home">
-          <span className="brand-glyph"><BookMarked size={21} /></span>
+          <Image className="brand-mark" src="/media/shelfmark-mark.png" alt="" width={30} height={30} priority />
           <span><strong>Shelfmark</strong><small>Find the book. Choose how to read it.</small></span>
         </button>
         <nav aria-label="Primary navigation">
@@ -345,16 +373,19 @@ export function BookLookup() {
             <Library size={16} /> My shelf <span className="nav-count">{savedBooks.length + localFiles.length}</span>
           </button>
         </nav>
-        <a className="transparency-link" href="#data-notice"><ShieldCheck size={15} /> Source transparent</a>
+        <a className="transparency-link" href="#data-notice"><PhosphorShieldCheck size={16} weight="regular" /> Source transparent</a>
       </header>
 
       {view === "find" ? (
         <div className="find-view">
           {!searched ? (
-            <section className="hero" aria-labelledby="hero-title">
-              <div className="hero-copy">
-                <p className="eyebrow"><span>01</span> Access-first book search</p>
-                <h1 id="hero-title">One book.<br /><em>Every legitimate way in.</em></h1>
+            <section className="portal-hero" aria-labelledby="hero-title">
+              <div className="portal-stage">
+                <Image className="portal-art" src="/media/reading-portal.webp" alt="" fill priority sizes="(max-width: 760px) 100vw, 62vw" />
+                <div className="portal-vignette" aria-hidden="true" />
+              <div className="portal-copy">
+                <p className="eyebrow"><span>01</span> Reading portal</p>
+                <h1 id="hero-title">One book.<br /><em>Every legitimate<br />way in.</em></h1>
                 <p className="hero-description">
                   Search a title, author, or ISBN. Shelfmark separates public-domain downloads, library borrowing,
                   previews, and purchase routes—without pretending a catalog record is a free ebook.
@@ -376,19 +407,9 @@ export function BookLookup() {
                 {notice ? <NoticeMessage message={notice} /> : null}
               </div>
 
-              <aside className="route-ledger" aria-label="Reading paths">
-                <div className="ledger-heading"><span>READING PATHS</span><small>ranked by usefulness</small></div>
-                <ol>
-                  <li><span className="ledger-index">A</span><Download size={18} /><div><strong>Download</strong><small>Verified public-domain EPUB or PDF</small></div></li>
-                  <li><span className="ledger-index">B</span><Library size={18} /><div><strong>Borrow</strong><small>Availability confirmed by the source library</small></div></li>
-                  <li><span className="ledger-index">C</span><Eye size={18} /><div><strong>Preview</strong><small>Read the pages a publisher has made available</small></div></li>
-                  <li><span className="ledger-index">D</span><ShoppingBag size={18} /><div><strong>Purchase</strong><small>Go to a legitimate seller when offered</small></div></li>
-                </ol>
-                <button className="shelf-summary" type="button" onClick={() => switchView("shelf")}>
-                  <span><Library size={18} /><strong>Your private shelf</strong></span>
-                  <span>{savedBooks.length + localFiles.length} items <ChevronRight size={17} /></span>
-                </button>
-              </aside>
+              <p className="portal-caption"><span>Search the index</span><span>One clear route at a time</span></p>
+              </div>
+              <DemoResultPanel saved={savedIds.has(DEMO_BOOK.id)} onSave={() => toggleSavedBook(DEMO_BOOK)} />
             </section>
           ) : null}
 
@@ -467,6 +488,35 @@ export function BookLookup() {
         <a href="https://github.com/DeepBlueLac/isbn-book-lookup" target="_blank" rel="noreferrer">Data & source notes <ExternalLink size={14} /></a>
       </footer>
     </main>
+  );
+}
+
+function DemoResultPanel({ saved, onSave }: { saved: boolean; onSave: () => void }) {
+  return (
+    <aside className="demo-result" aria-label="Example reading paths">
+      <div className="demo-result-book">
+        <Image src="/media/the-martian-cover.webp" alt="The Martian cover" width={188} height={250} priority />
+        <div className="demo-result-meta">
+          <p className="result-kicker">Selected book</p>
+          <h2>The Martian</h2>
+          <p className="result-author">Andy Weir</p>
+          <div className="result-facts"><span>2014</span><span>Crown Publishing Group</span><span>English</span></div>
+          <div className="result-tags"><span>Science fiction</span><span>Adventure</span></div>
+        </div>
+      </div>
+      <p className="result-description">A stranded astronaut must rely on ingenuity and unshakeable determination to survive.</p>
+      <div className="path-heading"><span>Choose your path</span><span>verified sources</span></div>
+      <ol className="demo-paths" id="reading-paths">
+        <li><a href={DEMO_BOOK.links.preview || "#"} target="_blank" rel="noreferrer"><span className="path-number">01</span><PhosphorEye size={22} weight="regular" /><span><strong>Preview</strong><small>Read a free sample</small></span><ArrowUpRight size={20} /></a></li>
+        <li><a href={DEMO_BOOK.links.borrow || "#"} target="_blank" rel="noreferrer"><span className="path-number">02</span><BookOpenText size={22} weight="regular" /><span><strong>Borrow</strong><small>Check library availability</small></span><ArrowUpRight size={20} /></a></li>
+        <li><a href={DEMO_BOOK.links.purchase || "#"} target="_blank" rel="noreferrer"><span className="path-number">03</span><ShoppingBagOpen size={22} weight="regular" /><span><strong>Purchase</strong><small>Buy from a trusted seller</small></span><ArrowUpRight size={20} /></a></li>
+      </ol>
+      <button className="demo-shelf" type="button" onClick={onSave}>
+        <BookmarkSimple size={20} weight={saved ? "fill" : "regular"} />
+        <span><strong>{saved ? "On my private shelf" : "Save to my private shelf"}</strong><small>{saved ? "Saved on this device" : "Stored locally in this browser"}</small></span>
+      </button>
+      <p className="demo-source"><PhosphorShieldCheck size={18} weight="regular" /> Source transparent. Availability varies by region.</p>
+    </aside>
   );
 }
 
@@ -555,7 +605,7 @@ function BookResults({
     <div className="results-layout">
       <section className="results-main" aria-live="polite">
         <div className="results-toolbar">
-          <div><p className="eyebrow"><span>02</span> Catalog results</p><h2>{books.length} editions and works</h2></div>
+          <div><p className="eyebrow"><span>02</span> Catalog results</p><h2>{books.length === 1 ? "1 edition" : `${books.length} editions and works`}</h2></div>
           <div className="access-filters" aria-label="Filter by access">
             <button className={filter === "all" ? "active" : ""} type="button" onClick={() => onFilter("all")}>All</button>
             {availableFilters.map((kind) => <button className={filter === kind ? "active" : ""} key={kind} type="button" onClick={() => onFilter(kind)}>{getFilterLabel(kind)}</button>)}

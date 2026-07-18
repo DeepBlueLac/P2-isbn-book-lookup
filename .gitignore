@@ -44,5 +44,10 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# local visual QA captures and browser traces
+/.playwright-cli/
+/tmp/
+/reports/design/
+
 .vercel
 .env*

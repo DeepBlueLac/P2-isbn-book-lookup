@@ -12,10 +12,10 @@
     "evidence": "Search results reserve the strongest visual hierarchy for real book records and access actions"
   },
   "brandMemory": [
-    "library shelfmark index rhythm",
-    "warm paper and deep forest ink",
-    "thin oxide-red catalog markers",
-    "editorial book-title typography"
+    "a dark reading portal built from layered book pages",
+    "black cherry and oxblood architecture with pale ice-blue type",
+    "electric coral path markers and action states",
+    "editorial book-title typography with a calm source ledger"
   ],
   "antiTemplateDirections": [
     "avoid generic SaaS three-card hero",
@@ -24,9 +24,9 @@
     "avoid decorative CSS book illustrations"
   ],
   "firstViewport": {
-    "mustSee": "brand promise, one search input, reading-path legend, and local shelf value",
+    "mustSee": "brand promise, one search input, a real selected-book preview, and legal reading paths",
     "primaryAction": "Find this book",
-    "visualWeight": "search and real result preview dominate; explanation remains compact"
+    "visualWeight": "the page portal and real result preview dominate; explanation remains compact"
   },
   "responsive": {
     "desktop1440": "two-part catalog desk with search dominant and result rows exposing direct actions",

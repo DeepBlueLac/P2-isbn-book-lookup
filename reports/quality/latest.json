@@ -1,14 +1,14 @@
 {
   "project": "isbn-book-lookup",
   "product": "Shelfmark",
-  "stage": "CORE",
-  "checkedAt": "2026-07-18T06:47:00.000Z",
-  "commit": "bb45753",
+  "stage": "POLISH",
+  "checkedAt": "2026-07-18T16:05:14.8984899Z",
+  "commit": "f4af9c1+working-tree",
   "commands": [
     { "command": "npm run check", "status": "pass", "detail": "ESLint and TypeScript passed" },
     { "command": "npm test", "status": "pass", "detail": "1 file, 5 tests passed" },
     { "command": "npm run web:export", "status": "pass", "detail": "Next.js build completed" }
   ],
-  "factoryAudit": "pending-clean-state-rerun",
-  "browserVisualAudit": "pending-user-browser-confirmation"
+  "factoryAudit": "pending-clean-state-rerun-after-design-commit",
+  "browserVisualAudit": "pass: Edge 1440x1024, 768x1024, 390x844; design-qa.md"
 }
