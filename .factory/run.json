@@ -1,33 +1,50 @@
 {
-  "schemaVersion": 1,
-  "projectSlug": "isbn-book-lookup",
-  "stage": "INTAKE",
-  "iteration": 0,
-  "maxIterations": {
-    "INTAKE": 2,
-    "DESIGN": 3,
-    "SCAFFOLD": 2,
-    "CORE": 4,
-    "EXPERIENCE": 6,
-    "POLISH": 4,
-    "VERIFY": 3,
-    "CANDIDATE": 1
-  },
-  "completedGates": [],
-  "failedChecks": [],
-  "evidence": [
-    {
-      "kind": "compile",
-      "path": "reports/quality/latest.json",
-      "status": "pending"
-    }
-  ],
-  "updatedAt": "2026-07-18T00:00:00.000Z",
-  "history": [
-    {
-      "stage": "INTAKE",
-      "at": "2026-07-18T00:00:00.000Z",
-      "note": "Initialized for Shelfmark Ralph product loop"
-    }
-  ]
+    "schemaVersion":  1,
+    "projectSlug":  "isbn-book-lookup",
+    "stage":  "SCAFFOLD",
+    "iteration":  2,
+    "maxIterations":  {
+                          "INTAKE":  2,
+                          "DESIGN":  3,
+                          "SCAFFOLD":  2,
+                          "CORE":  4,
+                          "EXPERIENCE":  6,
+                          "POLISH":  4,
+                          "VERIFY":  3,
+                          "CANDIDATE":  1
+                      },
+    "completedGates":  [
+                           "contracts.valid",
+                           "design.prompt"
+                       ],
+    "failedChecks":  [
+
+                     ],
+    "evidence":  [
+                     {
+                         "kind":  "compile",
+                         "path":  "reports/quality/latest.json",
+                         "status":  "pass"
+                     }
+                 ],
+    "updatedAt":  "2026-07-18T06:46:26.1989504Z",
+    "history":  [
+                    {
+                        "stage":  "INTAKE",
+                        "at":  "2026-07-18T00:00:00.000Z",
+                        "note":  "Initialized for Shelfmark Ralph product loop"
+                    },
+                    {
+                        "from":  "INTAKE",
+                        "to":  "DESIGN",
+                        "at":  "2026-07-18T06:45:53.3922813Z",
+                        "reason":  "advanced-after:contracts.valid"
+                    },
+                    {
+                        "from":  "DESIGN",
+                        "to":  "SCAFFOLD",
+                        "at":  "2026-07-18T06:46:26.1989504Z",
+                        "reason":  "advanced-after:design.prompt"
+                    }
+                ]
 }
