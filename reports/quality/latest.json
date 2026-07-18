@@ -1,0 +1,14 @@
+{
+  "project": "isbn-book-lookup",
+  "product": "Shelfmark",
+  "stage": "CORE",
+  "checkedAt": "2026-07-18T06:47:00.000Z",
+  "commit": "bb45753",
+  "commands": [
+    { "command": "npm run check", "status": "pass", "detail": "ESLint and TypeScript passed" },
+    { "command": "npm test", "status": "pass", "detail": "1 file, 5 tests passed" },
+    { "command": "npm run web:export", "status": "pass", "detail": "Next.js build completed" }
+  ],
+  "factoryAudit": "pending-clean-state-rerun",
+  "browserVisualAudit": "pending-user-browser-confirmation"
+}

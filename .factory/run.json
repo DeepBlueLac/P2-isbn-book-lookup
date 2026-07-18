@@ -1,8 +1,8 @@
 {
     "schemaVersion":  1,
     "projectSlug":  "isbn-book-lookup",
-    "stage":  "SCAFFOLD",
-    "iteration":  2,
+    "stage":  "CORE",
+    "iteration":  3,
     "maxIterations":  {
                           "INTAKE":  2,
                           "DESIGN":  3,
@@ -15,7 +15,9 @@
                       },
     "completedGates":  [
                            "contracts.valid",
-                           "design.prompt"
+                           "design.prompt",
+                           "scaffold.audit",
+                           "core.tests"
                        ],
     "failedChecks":  [
 
@@ -27,7 +29,7 @@
                          "status":  "pass"
                      }
                  ],
-    "updatedAt":  "2026-07-18T06:46:26.1989504Z",
+    "updatedAt":  "2026-07-18T06:47:00.6049481Z",
     "history":  [
                     {
                         "stage":  "INTAKE",
@@ -45,6 +47,12 @@
                         "to":  "SCAFFOLD",
                         "at":  "2026-07-18T06:46:26.1989504Z",
                         "reason":  "advanced-after:design.prompt"
+                    },
+                    {
+                        "from":  "SCAFFOLD",
+                        "to":  "CORE",
+                        "at":  "2026-07-18T06:47:00.6049481Z",
+                        "reason":  "advanced-after:scaffold.audit"
                     }
                 ]
 }
