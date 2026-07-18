@@ -14,6 +14,15 @@
 - 目标产品域名：`https://books.bulidoge.site`
 - 根域名 `bulidoge.site` 保留给未来的 DBL-TOOLS 产品总入口。
 
+## 2026-07-19 上线复核
+
+- `https://books.bulidoge.site/`：HTTPS 与首页 200。
+- `https://books.bulidoge.site/api/books/search?q=Pride%20and%20Prejudice&mode=search`：200；开放版本包含 Archive.org 官方格式入口。
+- `https://books.bulidoge.site/api/books/search?q=The%20Martian&mode=search`：200；受限版本只显示 Open Library 借阅/预览入口。
+- `robots.txt`、`sitemap.xml`、`privacy`：200，站点基址为 `https://books.bulidoge.site`。
+- Vercel 生产地址仍为 200，未修改。
+- `bulidoge.site` 与 `www.bulidoge.site` 当前 DNS 已进入 Cloudflare，但旧源站返回 521。需要在根域名策略确定后处理：保留旧源站时将两个 A 记录设为 DNS only；改为 DBL-TOOLS 总入口时，将根域名也绑定到独立的入口 Worker。
+
 ## 本地命令
 
 ```powershell
