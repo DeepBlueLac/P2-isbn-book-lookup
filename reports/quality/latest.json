@@ -9,6 +9,6 @@
     { "command": "npm test", "status": "pass", "detail": "2 files, 9 tests passed" },
     { "command": "npm run web:export", "status": "pass", "detail": "Next.js build completed" }
   ],
-  "factoryAudit": "pending-clean-state-rerun-after-evidence-commit",
+  "factoryAudit": "pass: compile-product DryRun ready; Ralph P0 tests 11/11 passed",
   "browserVisualAudit": "pass: existing Edge audit plus Open Library availability canary at 1440x900 and 390x844; reports/api/open-library-availability.md"
 }
