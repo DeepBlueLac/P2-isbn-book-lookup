@@ -21,6 +21,7 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 
 type BookResult = {
   id: string;
+  source: "Google Books" | "Project Gutenberg";
   title: string;
   subtitle: string | null;
   authors: string[];
@@ -300,7 +301,7 @@ export function BookLookup() {
                       {hasDownload(book) && <span className="downloadable"><Download size={12} /> 可下载</span>}
                     </div>
                     <p>{book.authors.join("、") || "作者未知"}</p>
-                    <small>{[book.publisher, book.publishedDate, book.language?.toUpperCase()].filter(Boolean).join(" · ")}</small>
+                    <small>{[book.source, book.publisher, book.publishedDate, book.language?.toUpperCase()].filter(Boolean).join(" · ")}</small>
                   </div>
                   <ChevronRight size={20} />
                 </button>
@@ -312,7 +313,7 @@ export function BookLookup() {
         {selected && <BookDetail book={selected} copied={copied} onCopy={copySummary} onBack={() => setSelected(null)} />}
       </section>
 
-      <footer>下载按钮仅展示 Google Books 明确标记为公版并提供官方下载链接的内容。</footer>
+      <footer>下载按钮仅展示 Google Books 或 Project Gutenberg 明确提供的公版官方下载链接。</footer>
     </main>
   );
 }
@@ -329,7 +330,7 @@ function BookDetail({ book, copied, onCopy, onBack }: { book: BookResult; copied
         <div className="result-heading">
           <div>
             <span className={`access-label ${hasDownload(book) ? "available" : "preview"}`}>
-              {hasDownload(book) ? <><ShieldCheck size={15} /> 公版可下载</> : <><FileText size={15} /> {book.previewLink ? "可在线预览" : "仅书目信息"}</>}
+              {hasDownload(book) ? <><ShieldCheck size={15} /> {book.source} 公版可下载</> : <><FileText size={15} /> {book.previewLink ? "可在线预览" : "仅书目信息"}</>}
             </span>
             <h2>{book.title}</h2>
             {book.subtitle && <p className="subtitle">{book.subtitle}</p>}
@@ -354,7 +355,7 @@ function BookDetail({ book, copied, onCopy, onBack }: { book: BookResult; copied
 
         {book.description && <p className="description">{book.description}</p>}
         {book.categories.length > 0 && <div className="subjects">{book.categories.slice(0, 6).map((category) => <span key={category}>{category}</span>)}</div>}
-        {book.infoLink && <a className="detail-link" href={book.infoLink} target="_blank" rel="noreferrer">在 Google Books 查看完整记录 <ExternalLink size={15} /></a>}
+        {book.infoLink && <a className="detail-link" href={book.infoLink} target="_blank" rel="noreferrer">在 {book.source} 查看完整记录 <ExternalLink size={15} /></a>}
       </div>
     </section>
   );

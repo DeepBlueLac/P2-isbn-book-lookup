@@ -23,6 +23,10 @@
 # misc
 .DS_Store
 *.pem
+*.jks
+*.keystore
+android/keystore.properties
+android/app/release/
 
 # debug
 npm-debug.log*
@@ -41,3 +45,4 @@ yarn-error.log*
 next-env.d.ts
 
 .vercel
+.env*

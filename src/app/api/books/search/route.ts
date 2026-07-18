@@ -35,6 +35,16 @@ type GoogleVolume = {
   };
 };
 
+type GutenbergBook = {
+  id: number;
+  title?: string;
+  authors?: { name?: string }[];
+  subjects?: string[];
+  languages?: string[];
+  download_count?: number;
+  formats?: Record<string, string>;
+};
+
 function safeUrl(value?: string) {
   if (!value) return null;
   try {
@@ -54,6 +64,7 @@ function normalize(volume: GoogleVolume) {
 
   return {
     id: volume.id || crypto.randomUUID(),
+    source: "Google Books",
     title: info.title || "未命名图书",
     subtitle: info.subtitle || null,
     authors: info.authors || [],
@@ -83,6 +94,48 @@ function normalize(volume: GoogleVolume) {
         }
       : null,
   };
+}
+
+function normalizeGutenberg(book: GutenbergBook) {
+  const formats = book.formats || {};
+  const epub = safeUrl(formats["application/epub+zip"]);
+  const pdf = safeUrl(formats["application/pdf"]);
+  const preview = safeUrl(
+    formats["text/html; charset=utf-8"] || formats["text/html; charset=iso-8859-1"] || formats["text/html"],
+  );
+  return {
+    id: `gutenberg-${book.id}`,
+    source: "Project Gutenberg" as const,
+    title: book.title || "未命名图书",
+    subtitle: null,
+    authors: (book.authors || []).map((author) => author.name).filter((name): name is string => Boolean(name)),
+    publisher: "Project Gutenberg",
+    publishedDate: null,
+    description: book.download_count ? `Project Gutenberg 公版电子书，累计下载 ${book.download_count.toLocaleString()} 次。` : null,
+    identifiers: [{ type: "GUTENBERG_ID", identifier: String(book.id) }],
+    pageCount: null,
+    categories: book.subjects || [],
+    averageRating: null,
+    ratingsCount: null,
+    language: book.languages?.[0] || null,
+    cover: safeUrl(formats["image/jpeg"]),
+    previewLink: preview || `https://www.gutenberg.org/ebooks/${book.id}`,
+    infoLink: `https://www.gutenberg.org/ebooks/${book.id}`,
+    publicDomain: true,
+    viewability: "ALL_PAGES",
+    downloads: { epub, pdf },
+    purchase: null,
+  };
+}
+
+function deduplicate<T extends { title: string; authors: string[] }>(books: T[]) {
+  const seen = new Set<string>();
+  return books.filter((book) => {
+    const key = `${book.title.toLowerCase().replace(/[^a-z0-9\u4e00-\u9fff]/g, "")}|${(book.authors[0] || "").toLowerCase().replace(/[^a-z0-9\u4e00-\u9fff]/g, "")}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 export async function GET(request: NextRequest) {
@@ -148,9 +201,27 @@ export async function GET(request: NextRequest) {
     }
 
     const data = (await response.json()) as { totalItems?: number; items?: GoogleVolume[] };
-    const books = (data.items || []).map(normalize);
+    const googleBooks = (data.items || []).map(normalize);
+    let gutenbergBooks: ReturnType<typeof normalizeGutenberg>[] = [];
+
+    if (mode === "search") {
+      try {
+        const gutenbergResponse = await fetch(
+          `https://gutendex.com/books?search=${encodeURIComponent(query)}`,
+          { signal: AbortSignal.timeout(10_000), cache: "no-store" },
+        );
+        if (gutenbergResponse.ok) {
+          const gutenbergData = (await gutenbergResponse.json()) as { results?: GutenbergBook[] };
+          gutenbergBooks = (gutenbergData.results || []).slice(0, 10).map(normalizeGutenberg);
+        }
+      } catch (error) {
+        console.warn("Gutendex request failed; continuing with Google Books", error instanceof Error ? error.message : error);
+      }
+    }
+
+    const books = deduplicate([...gutenbergBooks, ...googleBooks]).slice(0, 30);
     return NextResponse.json(
-      { total: data.totalItems || 0, books },
+      { total: books.length, books },
       { headers: { "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400" } },
     );
   } catch {
