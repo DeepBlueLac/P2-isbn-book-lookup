@@ -1,8 +1,8 @@
 {
     "schemaVersion":  1,
     "projectSlug":  "isbn-book-lookup",
-    "stage":  "EXPERIENCE",
-    "iteration":  4,
+    "stage":  "POLISH",
+    "iteration":  5,
     "maxIterations":  {
                           "INTAKE":  2,
                           "DESIGN":  3,
@@ -17,7 +17,9 @@
                            "contracts.valid",
                            "design.prompt",
                            "scaffold.audit",
-                           "core.tests"
+                           "core.tests",
+                           "experience.path",
+                           "visual.screenshots"
                        ],
     "failedChecks":  [
 
@@ -27,9 +29,19 @@
                          "kind":  "compile",
                          "path":  "reports/quality/latest.json",
                          "status":  "pass"
+                     },
+                     {
+                         "kind":  "playwright",
+                         "path":  "design-qa.md",
+                         "status":  "pass"
+                     },
+                     {
+                         "kind":  "visual",
+                         "path":  "reports/design/portal-final.png",
+                         "status":  "pass"
                      }
                  ],
-    "updatedAt":  "2026-07-18T06:47:52.1596060Z",
+    "updatedAt":  "2026-07-18T16:11:02.6978560Z",
     "history":  [
                     {
                         "stage":  "INTAKE",
@@ -59,6 +71,12 @@
                         "to":  "EXPERIENCE",
                         "at":  "2026-07-18T06:47:52.1596060Z",
                         "reason":  "advanced-after:core.tests"
+                    },
+                    {
+                        "from":  "EXPERIENCE",
+                        "to":  "POLISH",
+                        "at":  "2026-07-18T16:11:02.6978560Z",
+                        "reason":  "advanced-after:experience.path"
                     }
                 ]
 }
