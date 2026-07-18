@@ -1,8 +1,8 @@
 {
     "schemaVersion":  1,
     "projectSlug":  "isbn-book-lookup",
-    "stage":  "POLISH",
-    "iteration":  5,
+    "stage":  "VERIFY",
+    "iteration":  6,
     "maxIterations":  {
                           "INTAKE":  2,
                           "DESIGN":  3,
@@ -19,7 +19,10 @@
                            "scaffold.audit",
                            "core.tests",
                            "experience.path",
-                           "visual.screenshots"
+                           "visual.screenshots",
+                           "availability.download",
+                           "quality.gates",
+                           "browser.availability"
                        ],
     "failedChecks":  [
 
@@ -39,9 +42,14 @@
                          "kind":  "visual",
                          "path":  "reports/design/portal-final.png",
                          "status":  "pass"
+                     },
+                     {
+                         "kind":  "api",
+                         "path":  "reports/api/open-library-availability.md",
+                         "status":  "pass"
                      }
                  ],
-    "updatedAt":  "2026-07-18T16:11:02.6978560Z",
+    "updatedAt":  "2026-07-18T17:00:00.000Z",
     "history":  [
                     {
                         "stage":  "INTAKE",
@@ -77,6 +85,12 @@
                         "to":  "POLISH",
                         "at":  "2026-07-18T16:11:02.6978560Z",
                         "reason":  "advanced-after:experience.path"
+                    },
+                    {
+                        "from":  "POLISH",
+                        "to":  "VERIFY",
+                        "at":  "2026-07-18T17:00:00.000Z",
+                        "reason":  "advanced-after:availability.download"
                     }
                 ]
 }
