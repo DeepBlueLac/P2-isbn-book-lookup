@@ -6,7 +6,7 @@ import {
   type BookResult,
   type BookSource,
   type SourceState,
-} from "@/core/books";
+} from "../core/books";
 
 const OPEN_LIBRARY_HOSTS = ["openlibrary.org", "archive.org"];
 const GOOGLE_HOSTS = ["google.com", "googleapis.com", "googleusercontent.com"];
@@ -27,6 +27,19 @@ const openLibraryDocumentSchema = z
     ebook_access: z.string().optional(),
     has_fulltext: z.boolean().optional(),
     ia: z.array(z.string()).optional(),
+    availability: z
+      .object({
+        status: z.string().optional(),
+        is_readable: z.boolean().optional(),
+        is_lendable: z.boolean().optional(),
+        is_previewable: z.boolean().optional(),
+        is_restricted: z.boolean().optional(),
+        identifier: z.string().nullable().optional(),
+        openlibrary_work: z.string().nullable().optional(),
+        openlibrary_edition: z.string().nullable().optional(),
+      })
+      .nullable()
+      .optional(),
     ratings_average: z.number().optional(),
     ratings_count: z.number().optional(),
     subject: z.array(z.string()).optional(),
@@ -96,25 +109,46 @@ function cleanText(value?: string) {
   return value?.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim() || null;
 }
 
-async function fetchJson(url: string) {
+async function fetchJson(url: string, timeoutMs = 4_500) {
+  const configuredContact = process.env.OPEN_LIBRARY_CONTACT_EMAIL?.trim();
+  const contactEmail = configuredContact && configuredContact.length <= 254 && !/[\r\n]/.test(configuredContact)
+    ? configuredContact
+    : null;
+  const isOpenLibrary = new URL(url).hostname === "openlibrary.org";
+  const userAgent = isOpenLibrary && contactEmail
+    ? `Shelfmark/0.1 (${contactEmail})`
+    : "Shelfmark/0.1 (+https://github.com/DeepBlueLac/isbn-book-lookup)";
+  const headers: Record<string, string> = { Accept: "application/json", "User-Agent": userAgent };
+  if (isOpenLibrary && contactEmail) headers.email = contactEmail;
+
   const response = await fetch(url, {
-    signal: AbortSignal.timeout(4_500),
+    signal: AbortSignal.timeout(timeoutMs),
     cache: "no-store",
-    headers: { Accept: "application/json", "User-Agent": "Shelfmark/0.1 (+https://github.com/DeepBlueLac/isbn-book-lookup)" },
+    headers,
   });
   if (!response.ok) throw new Error(`upstream status ${response.status}`);
   return response.json() as Promise<unknown>;
 }
 
-function normalizeOpenLibrary(document: z.infer<typeof openLibraryDocumentSchema>): BookResult {
+export function normalizeOpenLibrary(document: z.infer<typeof openLibraryDocumentSchema>): BookResult {
   const workKey = document.key?.startsWith("/") ? document.key : document.key ? `/works/${document.key}` : null;
   const info = workKey ? safeExternalUrl(`https://openlibrary.org${workKey}`, OPEN_LIBRARY_HOSTS) : null;
-  const archive = document.ia?.[0]
-    ? safeExternalUrl(`https://archive.org/details/${encodeURIComponent(document.ia[0])}`, OPEN_LIBRARY_HOSTS)
+  const availability = document.availability || null;
+  const archiveIdentifier = availability?.identifier || document.ia?.[0] || null;
+  const archive = archiveIdentifier
+    ? safeExternalUrl(`https://archive.org/details/${encodeURIComponent(archiveIdentifier)}`, OPEN_LIBRARY_HOSTS)
     : null;
   const access = document.ebook_access || "no_ebook";
-  const borrow = access === "borrowable" ? info : null;
-  const preview = access === "public" || document.has_fulltext ? archive || info : null;
+  const edition = availability?.openlibrary_edition
+    ? safeExternalUrl(`https://openlibrary.org/books/${encodeURIComponent(availability.openlibrary_edition)}`, OPEN_LIBRARY_HOSTS)
+    : null;
+  const isOpenAccess = availability?.is_restricted !== true
+    && (access === "public" || availability?.status === "open" || availability?.is_readable === true);
+  const downloadPage = isOpenAccess ? archive : null;
+  const borrow = availability?.is_lendable === true || access === "borrowable" ? edition || info : null;
+  const preview = availability?.is_previewable === true || document.has_fulltext || access === "public"
+    ? archive || edition || info
+    : null;
   const identifiers = (document.isbn || []).slice(0, 6).map((identifier) => ({
     type: identifier.length === 13 ? "ISBN_13" : "ISBN_10",
     identifier,
@@ -139,7 +173,7 @@ function normalizeOpenLibrary(document: z.infer<typeof openLibraryDocumentSchema
       ? safeExternalUrl(`https://covers.openlibrary.org/b/id/${document.cover_i}-L.jpg`, ["openlibrary.org"])
       : null,
     publicDomain: false,
-    links: { epub: null, pdf: null, borrow, preview, purchase: null, info },
+    links: { epub: null, pdf: null, downloadPage, borrow, preview, purchase: null, info },
     purchase: null,
   };
 }
@@ -174,6 +208,7 @@ function normalizeGoogle(volume: z.infer<typeof googleVolumeSchema>): BookResult
     links: {
       epub: publicDomain ? safeExternalUrl(access.epub?.downloadLink, GOOGLE_HOSTS) : null,
       pdf: publicDomain ? safeExternalUrl(access.pdf?.downloadLink, GOOGLE_HOSTS) : null,
+      downloadPage: null,
       borrow: null,
       preview: safeExternalUrl(access.webReaderLink || info.previewLink, GOOGLE_HOSTS),
       purchase: purchaseLink,
@@ -214,7 +249,7 @@ function normalizeGutenberg(book: z.infer<typeof gutenbergBookSchema>): BookResu
     language: book.languages?.[0] || null,
     cover: safeExternalUrl(formats["image/jpeg"], GUTENBERG_HOSTS),
     publicDomain: true,
-    links: { epub, pdf, borrow: null, preview: preview || info, purchase: null, info },
+    links: { epub, pdf, downloadPage: null, borrow: null, preview: preview || info, purchase: null, info },
     purchase: null,
   };
 }
@@ -222,11 +257,11 @@ function normalizeGutenberg(book: z.infer<typeof gutenbergBookSchema>): BookResu
 async function searchOpenLibrary({ query, mode }: SearchInput) {
   const params = new URLSearchParams({
     q: mode === "isbn" ? `isbn:${query}` : query,
-    limit: mode === "isbn" ? "8" : "20",
+    limit: mode === "isbn" ? "8" : "12",
     fields:
-      "key,title,subtitle,author_name,first_publish_year,cover_i,isbn,language,publisher,edition_count,ebook_access,has_fulltext,ia,ratings_average,ratings_count,subject",
+      "key,title,subtitle,author_name,first_publish_year,cover_i,isbn,language,publisher,edition_count,ebook_access,has_fulltext,ia,availability,ratings_average,ratings_count,subject",
   });
-  const parsed = openLibraryResponseSchema.parse(await fetchJson(`https://openlibrary.org/search.json?${params}`));
+  const parsed = openLibraryResponseSchema.parse(await fetchJson(`https://openlibrary.org/search.json?${params}`, 9_000));
   return parsed.docs.map(normalizeOpenLibrary);
 }
 

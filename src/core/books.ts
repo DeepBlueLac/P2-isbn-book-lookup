@@ -22,6 +22,7 @@ export type BookResult = {
   links: {
     epub: string | null;
     pdf: string | null;
+    downloadPage: string | null;
     borrow: string | null;
     preview: string | null;
     purchase: string | null;
@@ -78,6 +79,15 @@ export function getPrimaryAccess(book: BookResult): AccessRoute {
       label: "Public-domain edition",
       actionLabel: book.links.epub ? "Get EPUB" : "Get PDF",
       href: book.links.epub || book.links.pdf,
+    };
+  }
+
+  if (book.links.downloadPage) {
+    return {
+      kind: "public-domain",
+      label: book.publicDomain ? "Public-domain edition" : "Open-access edition",
+      actionLabel: "View downloads",
+      href: book.links.downloadPage,
     };
   }
 

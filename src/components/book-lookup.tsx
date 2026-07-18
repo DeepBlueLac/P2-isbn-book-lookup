@@ -97,6 +97,7 @@ const DEMO_BOOK: BookResult = {
   links: {
     epub: null,
     pdf: null,
+    downloadPage: null,
     borrow: "https://openlibrary.org/isbn/9780553418026",
     preview: "https://books.google.com/books?vid=ISBN9780553418026",
     purchase: "https://books.google.com/books?vid=ISBN9780553418026",
@@ -673,6 +674,7 @@ function BookDetail({ book, saved, copied, onBack, onCopy, onSave, onReadingPath
   const actions = [
     { href: book.links.epub, label: "Download EPUB", icon: Download, kind: "public-domain" as AccessKind },
     { href: book.links.pdf, label: "Download PDF", icon: Download, kind: "public-domain" as AccessKind },
+    { href: book.links.downloadPage, label: "View download formats", icon: Download, kind: "public-domain" as AccessKind },
     { href: book.links.borrow, label: "Check library", icon: Library, kind: "borrow" as AccessKind },
     { href: book.links.preview, label: "Open preview", icon: Eye, kind: "preview" as AccessKind },
     { href: book.links.purchase, label: book.purchase?.amount ? `Buy · ${book.purchase.amount} ${book.purchase.currency || ""}` : "View purchase", icon: ShoppingBag, kind: "purchase" as AccessKind },

@@ -50,11 +50,22 @@
       "id": "A-005",
       "stage": "EXPERIENCE",
       "priority": "P0",
-      "description": "Result exposes a legitimate reading path",
-      "observableAssertion": "each result labels public download, borrow, preview, purchase, or metadata-only before detail",
+      "description": "Result exposes a legitimate reading or download path",
+      "observableAssertion": "each result labels official download formats, borrow, preview, purchase, or metadata-only before detail; restricted editions never receive a download action",
       "testMethod": "playwright",
       "viewport": "1440x900",
       "evidenceRequired": "results screenshot and trace",
+      "status": "pending"
+    },
+    {
+      "id": "A-013",
+      "stage": "CORE",
+      "priority": "P0",
+      "description": "Open Library availability is mapped without overstating rights",
+      "observableAssertion": "an unrestricted open result exposes the official Archive.org formats page, while The Martian-style restricted results expose borrow or preview only",
+      "testMethod": "unit",
+      "viewport": "not-applicable",
+      "evidenceRequired": "Open Library normalization Vitest output",
       "status": "pending"
     },
     {

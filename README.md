@@ -8,13 +8,13 @@ Shelfmark is an access-first book search tool for readers who want a clear, legi
 
 - Search by title, author, or ISBN-10/ISBN-13
 - Merge Open Library, Project Gutenberg, and optional Google Books results
-- Label public-domain download, borrow, preview, purchase, and catalog-only states explicitly
+- Label open-access download formats, borrow, preview, purchase, and catalog-only states explicitly
 - Save records to a private browser shelf without an account
 - Import user-owned EPUB/PDF files into browser IndexedDB and reopen them locally
 - Copy a clean book summary for notes or catalog work
 - Barcode scanning on supported Capacitor Android builds
 
-The product never treats an access-limited preview as a free download. A download action is shown only when the upstream source explicitly supplies a public-domain file link.
+The product never treats an access-limited preview as a free download. For Open Library, `availability.status=open` or an equivalent readable, unrestricted response reveals the official Archive.org formats page. A restricted or lendable edition never receives a download action.
 
 ## 本地运行
 
@@ -28,10 +28,21 @@ Configure `.env.local` when needed:
 
 ```text
 GOOGLE_BOOKS_API_KEY=optional_server_side_key
+OPEN_LIBRARY_CONTACT_EMAIL=you@example.com
 NEXT_PUBLIC_SITE_URL=http://localhost:3000
 ```
 
 The Google key is read only by the Next.js Route Handler and is never sent to the browser. Open Library and Gutendex can work without it.
+Set `OPEN_LIBRARY_CONTACT_EMAIL` to an address where Open Library can reach you. Shelfmark sends it only in the server-side Open Library request identity headers.
+
+If Windows exposes an `HTTPS_PROXY` but Node does not reach Open Library during local development, use Node 24+'s environment-proxy switch for that terminal:
+
+```powershell
+$env:NODE_OPTIONS="--use-env-proxy"
+npm run dev -- --hostname 127.0.0.1
+```
+
+This is a local network setting, not a production dependency. Vercel can call the public APIs directly unless your deployment environment requires its own egress proxy.
 
 ## 验证
 
