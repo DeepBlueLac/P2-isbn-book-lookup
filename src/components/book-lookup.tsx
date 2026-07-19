@@ -486,7 +486,7 @@ export function BookLookup() {
       <footer id="data-notice">
         <div><strong>Shelfmark</strong><span>Open Library · Google Books · Project Gutenberg</span></div>
         <p>Availability varies by edition and region. Local shelf files stay in this browser and are never uploaded.</p>
-        <a href="https://github.com/DeepBlueLac/isbn-book-lookup" target="_blank" rel="noreferrer">Data & source notes <ExternalLink size={14} /></a>
+        <a href="https://github.com/DeepBlueLac/P2-isbn-book-lookup" target="_blank" rel="noreferrer">Data & source notes <ExternalLink size={14} /></a>
       </footer>
     </main>
   );

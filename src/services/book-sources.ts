@@ -117,7 +117,7 @@ async function fetchJson(url: string, timeoutMs = 4_500) {
   const isOpenLibrary = new URL(url).hostname === "openlibrary.org";
   const userAgent = isOpenLibrary && contactEmail
     ? `Shelfmark/0.1 (${contactEmail})`
-    : "Shelfmark/0.1 (+https://github.com/DeepBlueLac/isbn-book-lookup)";
+    : "Shelfmark/0.1 (+https://github.com/DeepBlueLac/P2-isbn-book-lookup)";
   const headers: Record<string, string> = { Accept: "application/json", "User-Agent": userAgent };
   if (isOpenLibrary && contactEmail) headers.email = contactEmail;
 
