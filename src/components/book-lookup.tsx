@@ -26,6 +26,7 @@ import {
   X,
 } from "lucide-react";
 import Image from "next/image";
+import Link from "next/link";
 import { FormEvent, startTransition, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowUpRight, BookOpenText, BookmarkSimple, Eye as PhosphorEye, ShieldCheck as PhosphorShieldCheck, ShoppingBagOpen } from "@phosphor-icons/react";
 
@@ -462,6 +463,12 @@ export function BookLookup() {
                   Search a title, author, or ISBN. Shelfmark separates public-domain downloads, library borrowing,
                   previews, and purchase routes—without pretending a catalog record is a free ebook.
                 </p>
+                <nav className="task-shortcuts" aria-label="Common book search tasks">
+                  <span>Start with a task</span>
+                  <Link href="/find-book-by-title">Title or author</Link>
+                  <Link href="/isbn-lookup">ISBN lookup</Link>
+                  <Link href="/public-domain-book-finder">Public-domain books</Link>
+                </nav>
                 <SearchPanel
                   mode={mode}
                   query={query}
@@ -560,6 +567,7 @@ export function BookLookup() {
         <p>Availability varies by edition and region. Local shelf files stay in this browser and are never uploaded.</p>
         <div className="footer-links">
           <a href="https://bulidoge.site/products/shelfmark">DBL-TOOLS</a>
+          <Link href="/privacy">Privacy</Link>
           <a href="https://github.com/DeepBlueLac/P2-isbn-book-lookup" target="_blank" rel="noreferrer">Data & source notes <ExternalLink size={14} /></a>
         </div>
       </footer>

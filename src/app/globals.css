@@ -408,6 +408,10 @@ footer a:hover { color: var(--forest); }
   line-height: 1.72;
   text-wrap: pretty;
 }
+.task-shortcuts { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 14px; margin-top: 18px; color: #aab1b3; font-size: 11px; }
+.task-shortcuts span { color: var(--ice); font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.task-shortcuts a { min-height: 32px; display: inline-flex; align-items: center; border-bottom: 1px solid rgba(213, 231, 235, .25); color: #c4c8c8; }
+.task-shortcuts a:hover { border-bottom-color: var(--oxide); color: var(--ink); }
 .portal-copy .search-panel { max-width: 680px; margin-top: 30px; }
 .portal-copy .search-mode {
   gap: 16px;
