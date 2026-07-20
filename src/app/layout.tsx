@@ -17,6 +17,7 @@ const uiFont = Manrope({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://books.bulidoge.site"),
   title: {
     default: "Shelfmark — Find the book. Choose how to read it.",
     template: "%s · Shelfmark",
@@ -27,6 +28,7 @@ export const metadata: Metadata = {
     title: "Shelfmark — Find the book. Choose how to read it.",
     description: "Access-first book search with transparent sources and a private device-only shelf.",
     type: "website",
+    url: "https://books.bulidoge.site",
   },
 };
 

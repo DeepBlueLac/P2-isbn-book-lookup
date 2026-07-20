@@ -15,6 +15,7 @@ import {
   FileText,
   FolderOpen,
   Library,
+  Link2,
   LoaderCircle,
   LockKeyhole,
   ScanLine,
@@ -25,7 +26,7 @@ import {
   X,
 } from "lucide-react";
 import Image from "next/image";
-import { FormEvent, startTransition, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, startTransition, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowUpRight, BookOpenText, BookmarkSimple, Eye as PhosphorEye, ShieldCheck as PhosphorShieldCheck, ShoppingBagOpen } from "@phosphor-icons/react";
 
 import {
@@ -38,6 +39,12 @@ import {
   type SourceState,
 } from "@/core/books";
 import { trackProductEvent } from "@/platform/analytics";
+import {
+  buildShareableSearchUrl,
+  parseShareableSearch,
+  type SearchFilter,
+  type SearchMode,
+} from "@/platform/shareable-search";
 import {
   getLocalBook,
   importLocalBook,
@@ -206,8 +213,14 @@ export function BookLookup() {
     setFilter("all");
   }
 
-  async function lookup(value = query) {
-    const normalizedQuery = mode === "isbn" ? normalizeIsbn(value) : value.trim();
+  const lookup = useCallback(async (
+    value: string,
+    requestedMode: SearchMode,
+    requestedFilter: SearchFilter = "all",
+    historyMode: "push" | "replace" | "none" = "push",
+  ) => {
+    const normalizedQuery = requestedMode === "isbn" ? normalizeIsbn(value) : value.trim();
+    setMode(requestedMode);
     setQuery(value);
     setError("");
     setNotice("");
@@ -215,16 +228,26 @@ export function BookLookup() {
       setError("Enter a title, author, or ISBN to begin.");
       return;
     }
-    if (mode === "isbn" && !isValidIsbn(normalizedQuery)) {
+    if (requestedMode === "isbn" && !isValidIsbn(normalizedQuery)) {
       setError("Enter a valid ISBN-10 or ISBN-13. Spaces and hyphens are fine.");
       return;
+    }
+
+    if (historyMode !== "none") {
+      const nextUrl = buildShareableSearchUrl({
+        query: normalizedQuery,
+        mode: requestedMode,
+        access: requestedFilter,
+      });
+      if (historyMode === "replace") window.history.replaceState({}, "", nextUrl);
+      else window.history.pushState({}, "", nextUrl);
     }
 
     setLoading(true);
     setSearched(true);
     setSelected(null);
     try {
-      const params = new URLSearchParams({ q: normalizedQuery, mode });
+      const params = new URLSearchParams({ q: normalizedQuery, mode: requestedMode });
       const response = await fetch(`/api/books/search?${params}`);
       const data = (await response.json()) as {
         books?: BookResult[];
@@ -236,10 +259,10 @@ export function BookLookup() {
       const nextBooks = data.books || [];
       setBooks(nextBooks);
       setSources(data.sources || []);
-      setFilter("all");
-      if (mode === "isbn" && nextBooks.length === 1) setSelected(nextBooks[0]);
+      setFilter(requestedFilter);
+      if (requestedMode === "isbn" && nextBooks.length === 1) setSelected(nextBooks[0]);
       if (data.partial) setNotice("Some catalogs were unavailable. Showing the sources that responded.");
-      trackProductEvent("search_succeeded", { mode, result_count: nextBooks.length, partial: Boolean(data.partial) });
+      trackProductEvent("search_succeeded", { mode: requestedMode, result_count: nextBooks.length, partial: Boolean(data.partial) });
     } catch (reason) {
       setBooks([]);
       setSources([]);
@@ -247,11 +270,56 @@ export function BookLookup() {
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
+
+  useEffect(() => {
+    function syncFromUrl() {
+      const sharedSearch = parseShareableSearch(window.location.search);
+      if (!sharedSearch) {
+        setSearched(false);
+        setBooks([]);
+        setSources([]);
+        setSelected(null);
+        setFilter("all");
+        return;
+      }
+      void lookup(sharedSearch.query, sharedSearch.mode, sharedSearch.access, "none");
+    }
+
+    syncFromUrl();
+    window.addEventListener("popstate", syncFromUrl);
+    return () => window.removeEventListener("popstate", syncFromUrl);
+  }, [lookup]);
 
   function submit(event: FormEvent) {
     event.preventDefault();
-    void lookup();
+    void lookup(query, mode, "all");
+  }
+
+  function changeFilter(nextFilter: SearchFilter) {
+    setFilter(nextFilter);
+    const sharedSearch = parseShareableSearch(window.location.search);
+    if (!sharedSearch) return;
+    window.history.replaceState({}, "", buildShareableSearchUrl({ ...sharedSearch, access: nextFilter }));
+  }
+
+  function startNewSearch() {
+    setSearched(false);
+    setBooks([]);
+    setSources([]);
+    setSelected(null);
+    setFilter("all");
+    window.history.pushState({}, "", "/");
+  }
+
+  async function copyResultLink() {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      setNotice("Shareable search link copied.");
+      trackProductEvent("search_link_copied", { mode });
+    } catch {
+      setError("The result URL is ready in the address bar, but clipboard access is unavailable.");
+    }
   }
 
   async function scanIsbn() {
@@ -272,7 +340,7 @@ export function BookLookup() {
       const isbn = normalizeIsbn(value);
       setMode("isbn");
       setQuery(isbn);
-      await lookup(isbn);
+      await lookup(isbn, "isbn", "all");
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "The barcode could not be scanned.");
     } finally {
@@ -374,7 +442,10 @@ export function BookLookup() {
             <Library size={16} /> My shelf <span className="nav-count">{savedBooks.length + localFiles.length}</span>
           </button>
         </nav>
-        <a className="transparency-link" href="#data-notice"><PhosphorShieldCheck size={16} weight="regular" /> Source transparent</a>
+        <div className="topbar-links">
+          <a className="studio-link" href="https://bulidoge.site/products/shelfmark">DBL-TOOLS</a>
+          <a className="transparency-link" href="#data-notice"><PhosphorShieldCheck size={16} weight="regular" /> Source transparent</a>
+        </div>
       </header>
 
       {view === "find" ? (
@@ -401,7 +472,7 @@ export function BookLookup() {
                   onModeChange={changeMode}
                   onQueryChange={setQuery}
                   onSubmit={submit}
-                  onExample={(value) => void lookup(value)}
+                  onExample={(value) => void lookup(value, mode, "all")}
                   onScan={() => void scanIsbn()}
                 />
                 {error ? <ErrorMessage message={error} /> : null}
@@ -417,7 +488,7 @@ export function BookLookup() {
           {searched ? (
             <section className="catalog-workspace">
               <div className="compact-search-row">
-                <button className="compact-brand" type="button" onClick={() => { setSearched(false); setBooks([]); setSelected(null); }}>
+                <button className="compact-brand" type="button" onClick={startNewSearch}>
                   <ArrowLeft size={17} /> New search
                 </button>
                 <SearchPanel
@@ -431,7 +502,7 @@ export function BookLookup() {
                   onModeChange={changeMode}
                   onQueryChange={setQuery}
                   onSubmit={submit}
-                  onExample={(value) => void lookup(value)}
+                  onExample={(value) => void lookup(value, mode, "all")}
                   onScan={() => void scanIsbn()}
                 />
               </div>
@@ -456,7 +527,8 @@ export function BookLookup() {
                   sources={sources}
                   filter={filter}
                   savedIds={savedIds}
-                  onFilter={setFilter}
+                  onFilter={changeFilter}
+                  onCopyLink={() => void copyResultLink()}
                   onSelect={setSelected}
                   onSave={toggleSavedBook}
                   onReadingPath={openReadingPath}
@@ -486,7 +558,10 @@ export function BookLookup() {
       <footer id="data-notice">
         <div><strong>Shelfmark</strong><span>Open Library · Google Books · Project Gutenberg</span></div>
         <p>Availability varies by edition and region. Local shelf files stay in this browser and are never uploaded.</p>
-        <a href="https://github.com/DeepBlueLac/P2-isbn-book-lookup" target="_blank" rel="noreferrer">Data & source notes <ExternalLink size={14} /></a>
+        <div className="footer-links">
+          <a href="https://bulidoge.site/products/shelfmark">DBL-TOOLS</a>
+          <a href="https://github.com/DeepBlueLac/P2-isbn-book-lookup" target="_blank" rel="noreferrer">Data & source notes <ExternalLink size={14} /></a>
+        </div>
       </footer>
     </main>
   );
@@ -590,6 +665,7 @@ function BookResults({
   onSelect,
   onSave,
   onReadingPath,
+  onCopyLink,
 }: {
   books: BookResult[];
   visibleBooks: BookResult[];
@@ -600,6 +676,7 @@ function BookResults({
   onSelect: (book: BookResult) => void;
   onSave: (book: BookResult) => void;
   onReadingPath: (book: BookResult, route: ReturnType<typeof getPrimaryAccess>) => void;
+  onCopyLink: () => void;
 }) {
   const availableFilters = ACCESS_ORDER.filter((kind) => books.some((book) => getPrimaryAccess(book).kind === kind));
   return (
@@ -607,9 +684,12 @@ function BookResults({
       <section className="results-main" aria-live="polite">
         <div className="results-toolbar">
           <div><p className="eyebrow"><span>02</span> Catalog results</p><h2>{books.length === 1 ? "1 edition" : `${books.length} editions and works`}</h2></div>
-          <div className="access-filters" aria-label="Filter by access">
-            <button className={filter === "all" ? "active" : ""} type="button" onClick={() => onFilter("all")}>All</button>
-            {availableFilters.map((kind) => <button className={filter === kind ? "active" : ""} key={kind} type="button" onClick={() => onFilter(kind)}>{getFilterLabel(kind)}</button>)}
+          <div className="results-toolbar-actions">
+            <div className="access-filters" aria-label="Filter by access">
+              <button className={filter === "all" ? "active" : ""} type="button" onClick={() => onFilter("all")}>All</button>
+              {availableFilters.map((kind) => <button className={filter === kind ? "active" : ""} key={kind} type="button" onClick={() => onFilter(kind)}>{getFilterLabel(kind)}</button>)}
+            </div>
+            <button className="share-results" type="button" onClick={onCopyLink}><Link2 size={14} /> Copy result link</button>
           </div>
         </div>
         {visibleBooks.length ? (
