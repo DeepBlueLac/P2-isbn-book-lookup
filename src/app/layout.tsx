@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Cormorant_Garamond, Manrope } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 
 const displayFont = Cormorant_Garamond({
@@ -39,7 +40,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`${uiFont.variable} ${displayFont.variable}`}>
-      <body>{children}</body>
+      <body>
+        {children}
+        <Analytics />
+      </body>
     </html>
   );
 }
