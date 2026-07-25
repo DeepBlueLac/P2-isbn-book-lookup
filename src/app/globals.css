@@ -139,15 +139,6 @@ a { color: inherit; text-decoration: none; }
 .book-row-actions > div { display: flex; gap: 4px; }
 .book-row-actions > div button, .detail-actions > button { min-height: 36px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 0 9px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: transparent; color: var(--muted); font-size: 10px; font-weight: 800; }
 .book-row-actions > div button:hover, .detail-actions > button:hover, .book-row-actions > div button.saved, .detail-actions > button.saved { border-color: var(--forest); background: var(--forest-soft); color: var(--forest); }
-.source-rail { align-self: start; padding-top: 7px; border-top: 1px solid var(--line); }
-.source-rail > p:last-child { margin-top: 20px; color: var(--muted); font-size: 10px; line-height: 1.6; }
-.source-state { min-height: 63px; display: flex; align-items: center; gap: 9px; border-bottom: 1px solid var(--line); }
-.source-state > div { display: grid; gap: 3px; }
-.source-state strong { font-family: Georgia, "Times New Roman", serif; font-size: 15px; font-weight: 400; }
-.source-state small { color: var(--muted); font-size: 10px; line-height: 1.3; }
-.state-dot { width: 7px; height: 7px; flex-shrink: 0; border-radius: 50%; background: var(--muted); }
-.state-available { background: var(--forest); }
-.state-unavailable { background: var(--oxide); }
 .empty-results { min-height: 260px; display: grid; place-items: center; align-content: center; gap: 10px; color: var(--muted); text-align: center; }
 .empty-results h3 { color: var(--ink); font-family: Georgia, "Times New Roman", serif; font-size: 21px; font-weight: 400; }
 .empty-results p { font-size: 12px; }
@@ -247,9 +238,6 @@ footer a:hover { color: var(--forest); }
   .hero-copy { max-width: 760px; }
   .route-ledger { max-width: 700px; }
   .results-layout { grid-template-columns: 1fr; gap: 28px; }
-  .source-rail { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
-  .source-rail > .rail-label { grid-column: 1 / -1; }
-  .source-rail > p:last-child { grid-column: 1 / -1; margin-top: 0; }
   .shelf-grid { gap: 40px; }
   .detail-grid { padding-left: 0; padding-right: 0; }
 }
@@ -283,8 +271,6 @@ footer a:hover { color: var(--forest); }
   .book-row-actions { grid-column: 2; display: flex; align-items: center; justify-content: space-between; justify-items: stretch; }
   .book-row-actions > div { margin-left: auto; }
   .route-button { min-height: 42px; }
-  .source-rail { grid-template-columns: 1fr; gap: 0; }
-  .source-state { min-height: 51px; }
   .detail-grid { grid-template-columns: 1fr; gap: 32px; padding-top: 24px; }
   .detail-cover-column { justify-items: start; }
   .book-cover-detail { width: 180px; height: 255px; }
@@ -304,6 +290,122 @@ footer a:hover { color: var(--forest); }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}
+
+/* Download search integrated into the original Shelfmark workspace. */
+.account-actions { display: flex; align-items: center; gap: 8px; }
+.account-actions button {
+  min-height: 36px;
+  padding: 0 11px;
+  border: 1px solid rgba(211, 227, 232, .18);
+  border-radius: 3px;
+  background: transparent;
+  color: #a7adaf;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 700;
+}
+.account-actions .account-primary { border-color: rgba(255, 99, 79, .4); background: rgba(255, 99, 79, .08); color: #e8b1a9; }
+.account-actions button:disabled { cursor: not-allowed; opacity: .82; }
+
+.result-tabs { display: flex; align-items: center; gap: 25px; min-height: 54px; border-bottom: 1px solid var(--line); }
+.result-tabs button {
+  position: relative;
+  min-height: 54px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  background: transparent;
+  color: #8e989b;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+}
+.result-tabs button::after { content: ""; position: absolute; right: 0; bottom: -1px; left: 0; height: 2px; background: transparent; }
+.result-tabs button.active { color: var(--ink); }
+.result-tabs button.active::after { background: var(--oxide); }
+.result-tabs button span { min-width: 22px; padding: 3px 6px; border-radius: 10px; background: #171d20; color: #aab2b4; font-size: 9px; }
+
+.catalog-workspace .results-layout { grid-template-columns: minmax(0, 1fr); padding-top: 30px; }
+.format-select { display: grid; gap: 7px; color: #8f999c; font-size: 10px; font-weight: 700; }
+.format-select select {
+  min-width: 150px;
+  min-height: 40px;
+  padding: 0 34px 0 11px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: #101619;
+  color: var(--ink);
+  font: inherit;
+  font-size: 11px;
+}
+.download-list { border-bottom: 1px solid var(--line); }
+.download-row {
+  min-height: 132px;
+  padding: 17px 0;
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 17px;
+  border-bottom: 1px solid var(--line);
+}
+.download-row:last-child { border-bottom: 0; }
+.download-cover { position: relative; width: 64px; height: 92px; display: grid; place-items: center; overflow: hidden; border-radius: 3px; background: #151c1f; color: var(--ice); }
+.download-cover img { object-fit: cover; }
+.download-copy { min-width: 0; }
+.edition-badges { display: flex; align-items: center; gap: 6px; }
+.edition-badges span { padding: 4px 6px; border: 1px solid rgba(185, 216, 237, .2); border-radius: 3px; color: var(--ice); font-size: 9px; font-weight: 800; }
+.edition-badges span + span { color: #9da6a8; }
+.download-copy h3 { margin-top: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-display), serif; font-size: 23px; font-weight: 500; }
+.download-copy p { margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #c1c5c5; font-size: 13px; }
+.download-copy small { display: block; margin-top: 7px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #7f898c; font-size: 10px; }
+.download-button {
+  min-height: 44px;
+  padding: 0 13px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 1px solid var(--oxide);
+  border-radius: 3px;
+  background: var(--oxide);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.download-button:hover { background: #ff7866; }
+.demo-paths button {
+  width: 100%;
+  min-height: 68px;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 32px 28px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+.demo-paths button:hover { color: var(--oxide); }
+
+@media (max-width: 980px) {
+  .topbar-links .studio-link { display: none; }
+}
+
+@media (max-width: 760px) {
+  .account-actions .account-primary { display: none; }
+  .account-actions button { min-height: 34px; padding: 0 8px; }
+  .result-tabs { gap: 18px; overflow-x: auto; }
+  .result-tabs button { flex-shrink: 0; }
+  .download-row { grid-template-columns: 54px minmax(0, 1fr); gap: 13px; }
+  .download-cover { width: 54px; height: 78px; }
+  .download-button { grid-column: 2; justify-self: start; }
+  .download-copy h3 { font-size: 20px; }
+  .format-select, .format-select select { width: 100%; }
 }
 
 /* Shelfmark Reading Portal redesign */
@@ -545,7 +647,6 @@ footer a:hover { color: var(--forest); }
 .catalog-workspace .search-mode button.active { background: #1a2226; color: var(--ink); }
 .catalog-workspace .results-toolbar h2,
 .book-row-copy h3,
-.source-state strong,
 .detail-copy h2,
 .detail-subtitle,
 .section-heading h2,
@@ -570,8 +671,6 @@ footer a:hover { color: var(--forest); }
 .detail-actions > button:hover,
 .book-row-actions > div button.saved,
 .detail-actions > button.saved { border-color: rgba(255, 99, 79, .5); background: var(--oxide-soft); color: var(--ink); }
-.state-available { background: #64d7a1; }
-.state-unavailable { background: var(--oxide); }
 .detail-actions a:hover,
 .detail-actions a.primary { border-color: var(--oxide); background: var(--oxide); color: #fff; }
 .detail-actions a.primary:hover { background: #ff735f; }

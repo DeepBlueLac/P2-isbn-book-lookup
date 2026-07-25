@@ -28,8 +28,7 @@ import {
 import Image from "next/image";
 import Link from "next/link";
 import { FormEvent, startTransition, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowUpRight, BookOpenText, BookmarkSimple, Eye as PhosphorEye, ShieldCheck as PhosphorShieldCheck, ShoppingBagOpen } from "@phosphor-icons/react";
-
+import { ArrowUpRight, BookOpenText, BookmarkSimple, Eye as PhosphorEye, ShieldCheck as PhosphorShieldCheck } from "@phosphor-icons/react";
 import {
   formatBookSummary,
   getPrimaryAccess,
@@ -37,7 +36,7 @@ import {
   normalizeIsbn,
   type AccessKind,
   type BookResult,
-  type SourceState,
+  type DownloadEdition,
 } from "@/core/books";
 import { trackProductEvent } from "@/platform/analytics";
 import {
@@ -75,9 +74,9 @@ declare global {
 
 const EXAMPLES = {
   search: [
-    { value: "Pride and Prejudice", label: "Pride and Prejudice" },
-    { value: "Octavia Butler", label: "Octavia Butler" },
-    { value: "The Martian", label: "The Martian" },
+    { value: "火星救援", label: "火星救援" },
+    { value: "三体", label: "三体" },
+    { value: "Andy Weir", label: "Andy Weir" },
   ],
   isbn: [
     { value: "9780140328721", label: "9780140328721" },
@@ -160,7 +159,10 @@ export function BookLookup() {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<AccessKind | "all">("all");
   const [books, setBooks] = useState<BookResult[]>([]);
-  const [sources, setSources] = useState<SourceState[]>([]);
+  const [downloadEditions, setDownloadEditions] = useState<DownloadEdition[]>([]);
+  const [downloadTotal, setDownloadTotal] = useState(0);
+  const [resultView, setResultView] = useState<"downloads" | "catalog">("downloads");
+  const [downloadFormat, setDownloadFormat] = useState("all");
   const [selected, setSelected] = useState<BookResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -198,6 +200,10 @@ export function BookLookup() {
     if (filter === "all") return books;
     return books.filter((book) => getPrimaryAccess(book).kind === filter);
   }, [books, filter]);
+  const visibleDownloadEditions = useMemo(() => {
+    if (downloadFormat === "all") return downloadEditions;
+    return downloadEditions.filter((edition) => edition.format === downloadFormat);
+  }, [downloadEditions, downloadFormat]);
   const savedIds = useMemo(() => new Set(savedBooks.map((item) => item.id)), [savedBooks]);
 
   function switchView(next: "find" | "shelf") {
@@ -212,6 +218,7 @@ export function BookLookup() {
     setQuery("");
     setError("");
     setFilter("all");
+    setDownloadFormat("all");
   }
 
   const lookup = useCallback(async (
@@ -252,21 +259,27 @@ export function BookLookup() {
       const response = await fetch(`/api/books/search?${params}`);
       const data = (await response.json()) as {
         books?: BookResult[];
-        sources?: SourceState[];
+        downloadEditions?: DownloadEdition[];
+        downloadTotal?: number;
         partial?: boolean;
         error?: string;
       };
       if (!response.ok) throw new Error(data.error || "The catalog could not complete this search.");
       const nextBooks = data.books || [];
+      const nextDownloads = data.downloadEditions || [];
       setBooks(nextBooks);
-      setSources(data.sources || []);
+      setDownloadEditions(nextDownloads);
+      setDownloadTotal(data.downloadTotal || nextDownloads.length);
+      setDownloadFormat("all");
+      setResultView(nextDownloads.length ? "downloads" : "catalog");
       setFilter(requestedFilter);
       if (requestedMode === "isbn" && nextBooks.length === 1) setSelected(nextBooks[0]);
       if (data.partial) setNotice("Some catalogs were unavailable. Showing the sources that responded.");
       trackProductEvent("search_succeeded", { mode: requestedMode, result_count: nextBooks.length, partial: Boolean(data.partial) });
     } catch (reason) {
       setBooks([]);
-      setSources([]);
+      setDownloadEditions([]);
+      setDownloadTotal(0);
       setError(reason instanceof Error ? reason.message : "Book search is temporarily unavailable.");
     } finally {
       setLoading(false);
@@ -279,9 +292,11 @@ export function BookLookup() {
       if (!sharedSearch) {
         setSearched(false);
         setBooks([]);
-        setSources([]);
+        setDownloadEditions([]);
+        setDownloadTotal(0);
         setSelected(null);
         setFilter("all");
+        setDownloadFormat("all");
         return;
       }
       void lookup(sharedSearch.query, sharedSearch.mode, sharedSearch.access, "none");
@@ -307,9 +322,11 @@ export function BookLookup() {
   function startNewSearch() {
     setSearched(false);
     setBooks([]);
-    setSources([]);
+    setDownloadEditions([]);
+    setDownloadTotal(0);
     setSelected(null);
     setFilter("all");
+    setDownloadFormat("all");
     window.history.pushState({}, "", "/");
   }
 
@@ -445,7 +462,10 @@ export function BookLookup() {
         </nav>
         <div className="topbar-links">
           <a className="studio-link" href="https://bulidoge.site/products/shelfmark">DBL-TOOLS</a>
-          <a className="transparency-link" href="#data-notice"><PhosphorShieldCheck size={16} weight="regular" /> Source transparent</a>
+          <div className="account-actions" aria-label="Account access">
+            <button type="button" disabled title="Account access is planned for a later release">Log in</button>
+            <button className="account-primary" type="button" disabled title="Account registration is planned for a later release">Create account</button>
+          </div>
         </div>
       </header>
 
@@ -456,37 +476,35 @@ export function BookLookup() {
               <div className="portal-stage">
                 <Image className="portal-art" src="/media/reading-portal.webp" alt="" fill priority sizes="(max-width: 760px) 100vw, 62vw" />
                 <div className="portal-vignette" aria-hidden="true" />
-              <div className="portal-copy">
-                <p className="eyebrow"><span>01</span> Reading portal</p>
-                <h1 id="hero-title">One book.<br /><em>Every legitimate<br />way in.</em></h1>
-                <p className="hero-description">
-                  Search a title, author, or ISBN. Shelfmark separates public-domain downloads, library borrowing,
-                  previews, and purchase routes—without pretending a catalog record is a free ebook.
-                </p>
-                <nav className="task-shortcuts" aria-label="Common book search tasks">
-                  <span>Start with a task</span>
-                  <Link href="/find-book-by-title">Title or author</Link>
-                  <Link href="/isbn-lookup">ISBN lookup</Link>
-                  <Link href="/public-domain-book-finder">Public-domain books</Link>
-                </nav>
-                <SearchPanel
-                  mode={mode}
-                  query={query}
-                  loading={loading}
-                  invalidIsbn={invalidIsbn}
-                  nativeScanner={nativeScanner}
-                  scanning={scanning}
-                  onModeChange={changeMode}
-                  onQueryChange={setQuery}
-                  onSubmit={submit}
-                  onExample={(value) => void lookup(value, mode, "all")}
-                  onScan={() => void scanIsbn()}
-                />
-                {error ? <ErrorMessage message={error} /> : null}
-                {notice ? <NoticeMessage message={notice} /> : null}
-              </div>
-
-              <p className="portal-caption"><span>Search the index</span><span>One clear route at a time</span></p>
+                <div className="portal-copy">
+                  <p className="eyebrow"><span>01</span> Reading portal</p>
+                  <h1 id="hero-title">One book.<br /><em>Every way in.</em></h1>
+                  <p className="hero-description">
+                    Search a title, author, or ISBN, compare matching editions, and download the file format you need.
+                  </p>
+                  <nav className="task-shortcuts" aria-label="Common book search tasks">
+                    <span>Start with a task</span>
+                    <Link href="/find-book-by-title">Title or author</Link>
+                    <Link href="/isbn-lookup">ISBN lookup</Link>
+                    <Link href="/public-domain-book-finder">Browse by format</Link>
+                  </nav>
+                  <SearchPanel
+                    mode={mode}
+                    query={query}
+                    loading={loading}
+                    invalidIsbn={invalidIsbn}
+                    nativeScanner={nativeScanner}
+                    scanning={scanning}
+                    onModeChange={changeMode}
+                    onQueryChange={setQuery}
+                    onSubmit={submit}
+                    onExample={(value) => void lookup(value, mode, "all")}
+                    onScan={() => void scanIsbn()}
+                  />
+                  {error ? <ErrorMessage message={error} /> : null}
+                  {notice ? <NoticeMessage message={notice} /> : null}
+                </div>
+                <p className="portal-caption"><span>Search the index</span><span>One clear result at a time</span></p>
               </div>
               <DemoResultPanel saved={savedIds.has(DEMO_BOOK.id)} onSave={() => toggleSavedBook(DEMO_BOOK)} />
             </section>
@@ -528,18 +546,37 @@ export function BookLookup() {
                 />
               ) : null}
               {!loading && !selected ? (
-                <BookResults
-                  books={books}
-                  visibleBooks={visibleBooks}
-                  sources={sources}
-                  filter={filter}
-                  savedIds={savedIds}
-                  onFilter={changeFilter}
-                  onCopyLink={() => void copyResultLink()}
-                  onSelect={setSelected}
-                  onSave={toggleSavedBook}
-                  onReadingPath={openReadingPath}
-                />
+                <>
+                  <div className="result-tabs" role="tablist" aria-label="Search result view">
+                    <button className={resultView === "downloads" ? "active" : ""} type="button" role="tab" aria-selected={resultView === "downloads"} onClick={() => setResultView("downloads")}>
+                      Downloadable editions <span>{downloadEditions.length}</span>
+                    </button>
+                    <button className={resultView === "catalog" ? "active" : ""} type="button" role="tab" aria-selected={resultView === "catalog"} onClick={() => setResultView("catalog")}>
+                      Book information <span>{books.length}</span>
+                    </button>
+                  </div>
+                  {resultView === "downloads" ? (
+                    <DownloadResults
+                      editions={downloadEditions}
+                      visibleEditions={visibleDownloadEditions}
+                      total={downloadTotal}
+                      format={downloadFormat}
+                      onFormat={setDownloadFormat}
+                    />
+                  ) : (
+                    <BookResults
+                      books={books}
+                      visibleBooks={visibleBooks}
+                      filter={filter}
+                      savedIds={savedIds}
+                      onFilter={changeFilter}
+                      onCopyLink={() => void copyResultLink()}
+                      onSelect={setSelected}
+                      onSave={toggleSavedBook}
+                      onReadingPath={openReadingPath}
+                    />
+                  )}
+                </>
               ) : null}
             </section>
           ) : null}
@@ -563,8 +600,8 @@ export function BookLookup() {
       )}
 
       <footer id="data-notice">
-        <div><strong>Shelfmark</strong><span>Open Library · Google Books · Project Gutenberg</span></div>
-        <p>Availability varies by edition and region. Local shelf files stay in this browser and are never uploaded.</p>
+        <div><strong>Shelfmark</strong><span>Find the book. Choose the edition.</span></div>
+        <p>Search preferences and local shelf files stay in this browser.</p>
         <div className="footer-links">
           <a href="https://bulidoge.site/products/shelfmark">DBL-TOOLS</a>
           <Link href="/privacy">Privacy</Link>
@@ -589,17 +626,17 @@ function DemoResultPanel({ saved, onSave }: { saved: boolean; onSave: () => void
         </div>
       </div>
       <p className="result-description">A stranded astronaut must rely on ingenuity and unshakeable determination to survive.</p>
-      <div className="path-heading"><span>Choose your path</span><span>verified sources</span></div>
+      <div className="path-heading"><span>Choose your path</span><span>edition preview</span></div>
       <ol className="demo-paths" id="reading-paths">
         <li><a href={DEMO_BOOK.links.preview || "#"} target="_blank" rel="noreferrer"><span className="path-number">01</span><PhosphorEye size={22} weight="regular" /><span><strong>Preview</strong><small>Read a free sample</small></span><ArrowUpRight size={20} /></a></li>
         <li><a href={DEMO_BOOK.links.borrow || "#"} target="_blank" rel="noreferrer"><span className="path-number">02</span><BookOpenText size={22} weight="regular" /><span><strong>Borrow</strong><small>Check library availability</small></span><ArrowUpRight size={20} /></a></li>
-        <li><a href={DEMO_BOOK.links.purchase || "#"} target="_blank" rel="noreferrer"><span className="path-number">03</span><ShoppingBagOpen size={22} weight="regular" /><span><strong>Purchase</strong><small>Buy from a trusted seller</small></span><ArrowUpRight size={20} /></a></li>
+        <li><button type="button" onClick={() => document.getElementById("book-query")?.focus()}><span className="path-number">03</span><Download size={22} /><span><strong>Download</strong><small>Search available editions</small></span><ChevronRight size={20} /></button></li>
       </ol>
       <button className="demo-shelf" type="button" onClick={onSave}>
         <BookmarkSimple size={20} weight={saved ? "fill" : "regular"} />
         <span><strong>{saved ? "On my private shelf" : "Save to my private shelf"}</strong><small>{saved ? "Saved on this device" : "Stored locally in this browser"}</small></span>
       </button>
-      <p className="demo-source"><PhosphorShieldCheck size={18} weight="regular" /> Source transparent. Availability varies by region.</p>
+      <p className="demo-source"><PhosphorShieldCheck size={18} weight="regular" /> Search results update by title, author, or ISBN.</p>
     </aside>
   );
 }
@@ -635,7 +672,7 @@ function SearchPanel(props: SearchPanelProps) {
           id={props.compact ? "compact-book-query" : "book-query"}
           value={props.query}
           onChange={(event) => props.onQueryChange(event.target.value)}
-          placeholder={props.mode === "isbn" ? "9780553418026" : "Try The Martian or Andy Weir"}
+          placeholder={props.mode === "isbn" ? "9780553418026" : "Search 火星救援, a title, or an author"}
           autoComplete="off"
           inputMode={props.mode === "isbn" ? "text" : "search"}
           aria-invalid={props.invalidIsbn}
@@ -663,10 +700,67 @@ function SearchPanel(props: SearchPanelProps) {
   );
 }
 
+function DownloadResults({
+  editions,
+  visibleEditions,
+  total,
+  format,
+  onFormat,
+}: {
+  editions: DownloadEdition[];
+  visibleEditions: DownloadEdition[];
+  total: number;
+  format: string;
+  onFormat: (format: string) => void;
+}) {
+  const formats = Array.from(new Set(editions.map((edition) => edition.format))).sort();
+  return (
+    <div className="results-layout download-results-layout">
+      <section className="results-main" aria-live="polite">
+        <div className="results-toolbar">
+          <div><p className="eyebrow"><span>02</span> Downloadable editions</p><h2>{total ? `${total.toLocaleString()} matches` : "No downloadable editions"}</h2></div>
+          <label className="format-select">
+            <span>File format</span>
+            <select value={format} onChange={(event) => onFormat(event.target.value)}>
+              <option value="all">All formats</option>
+              {formats.map((item) => <option key={item} value={item}>{item.toUpperCase()}</option>)}
+            </select>
+          </label>
+        </div>
+        {visibleEditions.length ? (
+          <div className="download-list">
+            {visibleEditions.map((edition) => (
+              <article className="download-row" key={`${edition.id}-${edition.format}`}>
+                <div className="download-cover">
+                  {edition.cover ? <Image src={edition.cover} alt={`${edition.title} cover`} fill sizes="64px" unoptimized /> : <BookOpen size={22} />}
+                </div>
+                <div className="download-copy">
+                  <div className="edition-badges"><span>{edition.format.toUpperCase()}</span>{edition.size ? <span>{edition.size}</span> : null}</div>
+                  <h3>{edition.title}</h3>
+                  <p>{edition.author || "Author not listed"}</p>
+                  <small>{[edition.publisher, edition.year, edition.language].filter(Boolean).join(" · ")}</small>
+                </div>
+                <a
+                  className="download-button"
+                  href={`/api/books/download?token=${encodeURIComponent(edition.downloadIntent)}`}
+                  onClick={() => trackProductEvent("download_started", { source: "Z-Library", format: edition.format })}
+                >
+                  <Download size={16} /> Download {edition.format.toUpperCase()}
+                </a>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <div className="empty-results"><BookOpen size={30} /><h3>No editions match this format.</h3><p>Choose another file format or view book information.</p></div>
+        )}
+      </section>
+    </div>
+  );
+}
+
 function BookResults({
   books,
   visibleBooks,
-  sources,
   filter,
   savedIds,
   onFilter,
@@ -677,7 +771,6 @@ function BookResults({
 }: {
   books: BookResult[];
   visibleBooks: BookResult[];
-  sources: SourceState[];
   filter: AccessKind | "all";
   savedIds: Set<string>;
   onFilter: (filter: AccessKind | "all") => void;
@@ -734,16 +827,6 @@ function BookResults({
           <div className="empty-results"><BookOpen size={30} /><h3>No books match this access filter.</h3><p>Try all results or search with fewer words.</p></div>
         )}
       </section>
-      <aside className="source-rail">
-        <p className="rail-label">SOURCE CHECK</p>
-        {sources.map((source) => (
-          <div className="source-state" key={source.source}>
-            <span className={`state-dot state-${source.status}`} />
-            <div><strong>{source.source}</strong><small>{source.status === "available" ? source.detail : source.status === "skipped" ? "Not configured for this search" : "Temporarily unavailable"}</small></div>
-          </div>
-        ))}
-        <p>Results are merged, then deduplicated by ISBN or title and author. Availability can still vary by region.</p>
-      </aside>
     </div>
   );
 }

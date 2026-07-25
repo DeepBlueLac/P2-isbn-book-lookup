@@ -1,4 +1,18 @@
-export type BookSource = "Open Library" | "Google Books" | "Project Gutenberg";
+export type BookSource = "Open Library" | "Google Books" | "Project Gutenberg" | "Z-Library";
+
+export type DownloadEdition = {
+  id: string;
+  title: string;
+  author: string;
+  year: string | null;
+  format: string;
+  size: string | null;
+  language: string | null;
+  cover: string | null;
+  publisher: string | null;
+  identifier: string | null;
+  downloadIntent: string;
+};
 
 export type AccessKind = "public-domain" | "borrow" | "preview" | "purchase" | "metadata";
 
