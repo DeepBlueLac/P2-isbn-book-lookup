@@ -472,8 +472,6 @@ footer a:hover { color: var(--forest); }
   object-fit: cover;
   object-position: 54% center;
   filter: saturate(.9) contrast(1.04) brightness(.76);
-  transform: scale(1.035);
-  animation: portal-drift 14s cubic-bezier(.22, 1, .36, 1) infinite alternate;
 }
 .portal-vignette {
   position: absolute;
@@ -488,7 +486,6 @@ footer a:hover { color: var(--forest); }
   position: relative;
   z-index: 2;
   width: min(620px, 82%);
-  animation: portal-copy-in .8s cubic-bezier(.22, 1, .36, 1) both;
 }
 .eyebrow { color: var(--ice); font-size: 11px; font-weight: 700; letter-spacing: .19em; }
 .eyebrow span { color: var(--oxide); font-family: var(--font-ui), sans-serif; font-variant-numeric: tabular-nums; }
@@ -582,7 +579,6 @@ footer a:hover { color: var(--forest); }
   overflow-y: auto;
   border-left: 1px solid rgba(213, 231, 235, .18);
   background: #080c0f;
-  animation: result-panel-in .72s .12s cubic-bezier(.22, 1, .36, 1) both;
 }
 .demo-result-book { display: grid; grid-template-columns: minmax(118px, 42%) minmax(0, 1fr); align-items: start; gap: clamp(22px, 2.5vw, 38px); }
 .demo-result-book > img { width: 100%; height: auto; aspect-ratio: 3 / 4; object-fit: cover; box-shadow: 0 24px 55px rgba(0, 0, 0, .48); }
@@ -684,19 +680,6 @@ footer a:hover { color: var(--forest); }
 .import-dropzone:hover { border-color: var(--oxide); background: var(--oxide-soft); }
 footer { width: min(1320px, calc(100% - 48px)); border-top-color: var(--line); }
 footer strong { font-family: var(--font-display), serif; color: var(--ink); }
-
-@keyframes portal-drift {
-  from { transform: scale(1.035) translate3d(0, 0, 0); }
-  to { transform: scale(1.065) translate3d(-1.2%, -.6%, 0); }
-}
-@keyframes portal-copy-in {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-@keyframes result-panel-in {
-  from { opacity: 0; transform: translateX(22px); }
-  to { opacity: 1; transform: translateX(0); }
-}
 
 @media (max-width: 1180px) {
   .portal-hero { grid-template-columns: minmax(0, 56%) minmax(450px, 44%); }
