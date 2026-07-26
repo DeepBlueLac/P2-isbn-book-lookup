@@ -31,11 +31,13 @@ export function CinematicHome({ heroContent, preview }: CinematicHomeProps) {
 
     media.add({
       desktop: "(min-width: 921px)",
+      mobile: "(max-width: 920px)",
       reduceMotion: "(prefers-reduced-motion: reduce)",
       finePointer: "(pointer: fine)",
     }, (context) => {
       const conditions = context.conditions as {
         desktop: boolean;
+        mobile: boolean;
         reduceMotion: boolean;
         finePointer: boolean;
       };
@@ -197,10 +199,148 @@ export function CinematicHome({ heroContent, preview }: CinematicHomeProps) {
           xPercent: 58,
           z: -180,
           scale: 0.76,
-          autoAlpha: 0.14,
+          autoAlpha: 0,
           duration: 0.48,
           ease: "power3.inOut",
-        }, 2.02);
+        }, 1.92);
+
+        gsap.timeline({
+          scrollTrigger: {
+            id: "shelfmark-mobile-stage-one",
+            trigger: ".story-scene--one",
+            start: "top 76%",
+            end: "bottom 28%",
+            scrub: 0.45,
+          },
+        })
+          .fromTo(".story-stage-one", {
+            clipPath: "inset(0 0 100% 0)",
+          }, {
+            clipPath: "inset(0 0 0% 0)",
+            duration: 0.34,
+            ease: "none",
+          })
+          .fromTo(".story-spine", {
+            y: 150,
+            z: -420,
+            rotationX: 18,
+            rotationY: (index) => index % 2 ? 18 : -18,
+          }, {
+            y: 0,
+            z: 0,
+            rotationX: 0,
+            rotationY: 0,
+            stagger: 0.035,
+            duration: 0.66,
+            ease: "none",
+          }, 0.18);
+
+        const categoryTrack = rootRef.current?.querySelector<HTMLElement>(".story-categories");
+        if (categoryTrack) {
+          gsap.fromTo(categoryTrack, {
+            x: 0,
+          }, {
+            x: () => -Math.max(0, categoryTrack.scrollWidth - window.innerWidth + 40),
+            ease: "none",
+            scrollTrigger: {
+              id: "shelfmark-mobile-stage-two-track",
+              trigger: ".story-scene--two",
+              start: "36% 68%",
+              end: "bottom 18%",
+              scrub: 0.55,
+              invalidateOnRefresh: true,
+            },
+          });
+        }
+
+        gsap.timeline({
+          scrollTrigger: {
+            id: "shelfmark-mobile-stage-two",
+            trigger: ".story-scene--two",
+            start: "top 76%",
+            end: "55% 38%",
+            scrub: 0.45,
+          },
+        })
+          .fromTo(".story-stage-two", {
+            clipPath: "inset(0 0 100% 0)",
+          }, {
+            clipPath: "inset(0 0 0% 0)",
+            duration: 0.38,
+            ease: "none",
+          })
+          .fromTo(".category-volume", {
+            y: 90,
+            rotationY: -18,
+            autoAlpha: 0.2,
+          }, {
+            y: 0,
+            rotationY: 0,
+            autoAlpha: 1,
+            stagger: 0.06,
+            duration: 0.62,
+            ease: "none",
+          }, 0.2);
+
+        gsap.timeline({
+          scrollTrigger: {
+            id: "shelfmark-mobile-stage-three",
+            trigger: ".story-scene--three",
+            start: "top 78%",
+            end: "45% 38%",
+            scrub: 0.45,
+          },
+        })
+          .fromTo(".story-stage-three", {
+            clipPath: "inset(0 0 100% 0)",
+          }, {
+            clipPath: "inset(0 0 0% 0)",
+            duration: 0.36,
+            ease: "none",
+          })
+          .fromTo(".story-selected-book", {
+            y: 120,
+            z: -500,
+            rotationY: -34,
+            scale: 0.62,
+            autoAlpha: 0,
+          }, {
+            y: 0,
+            z: 0,
+            rotationY: -8,
+            scale: 1,
+            autoAlpha: 1,
+            duration: 0.64,
+            ease: "none",
+          }, 0.2);
+
+        gsap.timeline({
+          scrollTrigger: {
+            id: "shelfmark-mobile-book-handoff",
+            trigger: ".story-selection",
+            start: "top 94%",
+            end: "top 48%",
+            scrub: 0.45,
+          },
+        })
+          .to(".story-selected-book img", {
+            y: 110,
+            scale: 0.58,
+            autoAlpha: 0,
+            duration: 0.42,
+            ease: "none",
+          }, 0)
+          .fromTo(".story-selection", {
+            clipPath: "inset(0 0 18% 0)",
+            y: 72,
+            autoAlpha: 0,
+          }, {
+            clipPath: "inset(0 0 0% 0)",
+            y: 0,
+            autoAlpha: 1,
+            duration: 0.58,
+            ease: "none",
+          }, 0.42);
       }
 
       if (conditions.desktop) {
@@ -424,48 +564,53 @@ export function CinematicHome({ heroContent, preview }: CinematicHomeProps) {
           <Image className="story-bg" src="/media/reading-portal.webp" alt="" fill sizes="100vw" />
           <div className="story-shade" aria-hidden="true" />
 
-          <div className="story-shelf-space" aria-hidden="true">
-            <div className="shelf-plane" />
-            <div className="story-spines">
-              {SHELF_SPINES.map((name, index) => (
-                <span className="story-spine" key={name} style={{ "--spine-offset": `${index * 10.8}vw` } as CSSProperties}>{name}</span>
+          <div className="story-scene story-scene--one">
+            <div className="story-stage story-stage-one">
+              <span>Stage 01 / Space</span>
+              <h2>The shelf opens.</h2>
+              <p>Millions of editions resolve into one searchable space.</p>
+            </div>
+            <div className="story-shelf-space" aria-hidden="true">
+              <div className="shelf-plane" />
+              <div className="story-spines">
+                {SHELF_SPINES.map((name, index) => (
+                  <span className="story-spine" key={name} style={{ "--spine-offset": `${index * 10.8}vw` } as CSSProperties}>{name}</span>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="story-scene story-scene--two">
+            <div className="story-stage story-stage-two">
+              <span>Stage 02 / Explore</span>
+              <h2>Move through ideas.</h2>
+              <p>Browse by subject, then narrow the field without losing context.</p>
+            </div>
+
+            <div className="story-categories" aria-hidden="true">
+              {CATEGORIES.map((category) => (
+                <article className="category-volume" key={category.name}>
+                  <span>{category.index}</span>
+                  <strong>{category.name}</strong>
+                  <small>{category.detail}</small>
+                </article>
               ))}
             </div>
           </div>
 
-          <div className="story-stage story-stage-one">
-            <span>Stage 01 / Space</span>
-            <h2>The shelf opens.</h2>
-            <p>Millions of editions resolve into one searchable space.</p>
-          </div>
+          <div className="story-scene story-scene--three">
+            <div className="story-stage story-stage-three">
+              <span>Stage 03 / Choose</span>
+              <h2>One book.<br />Every way in.</h2>
+              <p>Confirm the edition, then continue to preview, borrow, or download.</p>
+            </div>
 
-          <div className="story-stage story-stage-two">
-            <span>Stage 02 / Explore</span>
-            <h2>Move through ideas.</h2>
-            <p>Browse by subject, then narrow the field without losing context.</p>
-          </div>
+            <div className="story-selected-book" aria-hidden="true">
+              <Image src="/media/the-martian-cover.webp" alt="" fill sizes="230px" />
+            </div>
 
-          <div className="story-categories" aria-hidden="true">
-            {CATEGORIES.map((category) => (
-              <article className="category-volume" key={category.name}>
-                <span>{category.index}</span>
-                <strong>{category.name}</strong>
-                <small>{category.detail}</small>
-              </article>
-            ))}
+            <div className="story-selection">{preview}</div>
           </div>
-
-          <div className="story-selected-book" aria-hidden="true">
-            <Image src="/media/the-martian-cover.webp" alt="" fill sizes="230px" />
-          </div>
-
-          <div className="story-stage story-stage-three">
-            <span>Stage 03 / Choose</span>
-            <h2>One book.<br />Every way in.</h2>
-            <p>Confirm the edition, then continue to preview, borrow, or download.</p>
-          </div>
-
-          <div className="story-selection">{preview}</div>
 
           <div className="story-progress" aria-hidden="true">
             <span className="story-progress-fill" />
