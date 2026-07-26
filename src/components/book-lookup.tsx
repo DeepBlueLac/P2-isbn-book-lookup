@@ -28,9 +28,8 @@ import {
 import Image from "next/image";
 import Link from "next/link";
 import { FormEvent, startTransition, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useGSAP } from "@gsap/react";
 import { ArrowUpRight, BookOpenText, BookmarkSimple, Eye as PhosphorEye, ShieldCheck as PhosphorShieldCheck } from "@phosphor-icons/react";
-import gsap from "gsap";
+import { CinematicHome } from "@/components/cinematic-home";
 import {
   formatBookSummary,
   getPrimaryAccess,
@@ -58,8 +57,6 @@ import {
   type LocalBookFile,
   type SavedBook,
 } from "@/platform/local-library";
-
-gsap.registerPlugin(useGSAP);
 
 type NativeBarcodePlugin = {
   isSupported?: () => Promise<{ supported: boolean }>;
@@ -180,59 +177,6 @@ export function BookLookup() {
   const [scanning, setScanning] = useState(false);
   const [importing, setImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const motionScopeRef = useRef<HTMLElement>(null);
-
-  useGSAP(() => {
-    if (view !== "find") return;
-
-    const media = gsap.matchMedia();
-    media.add("(prefers-reduced-motion: no-preference)", () => {
-      if (!searched) {
-        gsap.timeline({ defaults: { ease: "power2.out" } })
-          .fromTo(".portal-art", { scale: 1.04 }, { scale: 1, duration: 1.2 }, 0)
-          .from(".portal-copy .eyebrow", { autoAlpha: 0, y: 10, duration: 0.35 }, 0.1)
-          .from(".portal-copy h1", { autoAlpha: 0, y: 18, duration: 0.65 }, 0.16)
-          .from(".portal-copy .hero-description", { autoAlpha: 0, y: 12, duration: 0.45 }, 0.32)
-          .from(".portal-copy .task-shortcuts", { autoAlpha: 0, y: 10, duration: 0.4 }, 0.4)
-          .from(".portal-copy .search-panel", { autoAlpha: 0, y: 14, duration: 0.5 }, 0.46)
-          .from(".portal-caption", { autoAlpha: 0, duration: 0.35 }, 0.62)
-          .from(".demo-result", { autoAlpha: 0, x: 18, duration: 0.65 }, 0.2);
-        return;
-      }
-
-      if (!loading) {
-        gsap.timeline({ defaults: { ease: "power2.out" } })
-          .from(".compact-search-row", { autoAlpha: 0, y: -8, duration: 0.32 })
-          .from(".result-tabs", { autoAlpha: 0, y: 8, duration: 0.3 }, "<0.08")
-          .from(".results-toolbar", { autoAlpha: 0, y: 10, duration: 0.35 }, "<0.08");
-      }
-    });
-
-    return () => media.revert();
-  }, { scope: motionScopeRef, dependencies: [view, searched, loading], revertOnUpdate: true });
-
-  useGSAP(() => {
-    if (view !== "find" || !searched || loading) return;
-
-    const media = gsap.matchMedia();
-    media.add("(prefers-reduced-motion: no-preference)", () => {
-      const rows = gsap.utils.toArray<HTMLElement>(".download-row, .book-row").slice(0, 8);
-      if (!rows.length) return;
-      gsap.from(rows, {
-        autoAlpha: 0,
-        y: 12,
-        duration: 0.36,
-        ease: "power2.out",
-        stagger: 0.045,
-      });
-    });
-
-    return () => media.revert();
-  }, {
-    scope: motionScopeRef,
-    dependencies: [view, searched, loading, resultView, downloadFormat, filter],
-    revertOnUpdate: true,
-  });
 
   useEffect(() => {
     const shelfTimer = window.setTimeout(() => {
@@ -503,7 +447,7 @@ export function BookLookup() {
   }
 
   return (
-    <main ref={motionScopeRef} className="app-shell">
+    <main className="app-shell">
       <header className="topbar">
         <button className="brand" type="button" onClick={() => switchView("find")} aria-label="Shelfmark home">
           <Image className="brand-mark" src="/media/shelfmark-mark.png" alt="" width={30} height={30} priority />
@@ -529,22 +473,17 @@ export function BookLookup() {
       {view === "find" ? (
         <div className="find-view">
           {!searched ? (
-            <section className="portal-hero" aria-labelledby="hero-title">
-              <div className="portal-stage">
-                <Image className="portal-art" src="/media/reading-portal.webp" alt="" fill priority sizes="(max-width: 760px) 100vw, 62vw" />
-                <div className="portal-vignette" aria-hidden="true" />
-                <div className="portal-copy">
+            <CinematicHome
+              heroContent={(
+                <>
                   <p className="eyebrow"><span>01</span> Reading portal</p>
-                  <h1 id="hero-title">One book.<br /><em>Every way in.</em></h1>
+                  <h1 id="hero-title">
+                    <span className="hero-title-line">Find the book.</span>
+                    <em className="hero-title-line">Get the file.</em>
+                  </h1>
                   <p className="hero-description">
-                    Search a title, author, or ISBN, compare matching editions, and download the file format you need.
+                    Search millions of books and start reading instantly.
                   </p>
-                  <nav className="task-shortcuts" aria-label="Common book search tasks">
-                    <span>Start with a task</span>
-                    <Link href="/find-book-by-title">Title or author</Link>
-                    <Link href="/isbn-lookup">ISBN lookup</Link>
-                    <Link href="/public-domain-book-finder">Browse by format</Link>
-                  </nav>
                   <SearchPanel
                     mode={mode}
                     query={query}
@@ -558,13 +497,18 @@ export function BookLookup() {
                     onExample={(value) => void lookup(value, mode, "all")}
                     onScan={() => void scanIsbn()}
                   />
+                  <nav className="task-shortcuts" aria-label="Common book search tasks">
+                    <span>Explore</span>
+                    <Link href="/find-book-by-title">Title or author</Link>
+                    <Link href="/isbn-lookup">ISBN lookup</Link>
+                    <Link href="/public-domain-book-finder">Browse by format</Link>
+                  </nav>
                   {error ? <ErrorMessage message={error} /> : null}
                   {notice ? <NoticeMessage message={notice} /> : null}
-                </div>
-                <p className="portal-caption"><span>Search the index</span><span>One clear result at a time</span></p>
-              </div>
-              <DemoResultPanel saved={savedIds.has(DEMO_BOOK.id)} onSave={() => toggleSavedBook(DEMO_BOOK)} />
-            </section>
+                </>
+              )}
+              preview={<DemoResultPanel saved={savedIds.has(DEMO_BOOK.id)} onSave={() => toggleSavedBook(DEMO_BOOK)} />}
+            />
           ) : null}
 
           {searched ? (
