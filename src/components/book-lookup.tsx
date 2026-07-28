@@ -29,6 +29,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { FormEvent, startTransition, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowUpRight, BookOpenText, BookmarkSimple, Eye as PhosphorEye, ShieldCheck as PhosphorShieldCheck } from "@phosphor-icons/react";
+import type { Session } from "@supabase/supabase-js";
 import { CinematicHome } from "@/components/cinematic-home";
 import {
   formatBookSummary,
@@ -57,6 +58,22 @@ import {
   type LocalBookFile,
   type SavedBook,
 } from "@/platform/local-library";
+import { getSupabaseBrowserClient } from "@/services/supabase/client";
+
+type QuotaSnapshot = {
+  subject: {
+    kind: "guest" | "user";
+    email: string | null;
+    dailyDownloads: number;
+  };
+  usedDownloads: number;
+  remainingDownloads: number;
+  resetAt: string;
+};
+
+type PendingDownload = {
+  edition: DownloadEdition;
+};
 
 type NativeBarcodePlugin = {
   isSupported?: () => Promise<{ supported: boolean }>;
@@ -154,6 +171,18 @@ function formatDate(value: string) {
   return new Intl.DateTimeFormat("en", { month: "short", day: "numeric", year: "numeric" }).format(new Date(value));
 }
 
+function fileNameFromDisposition(value: string | null, fallback: string) {
+  const encoded = value?.match(/filename\*=UTF-8''([^;]+)/i)?.[1];
+  if (encoded) {
+    try {
+      return decodeURIComponent(encoded);
+    } catch {
+      return fallback;
+    }
+  }
+  return value?.match(/filename="?([^";]+)"?/i)?.[1] || fallback;
+}
+
 export function BookLookup() {
   const [view, setView] = useState<"find" | "shelf">("find");
   const [mode, setMode] = useState<"search" | "isbn">("search");
@@ -176,6 +205,19 @@ export function BookLookup() {
   const [nativeScanner, setNativeScanner] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [quota, setQuota] = useState<QuotaSnapshot | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
+  const [authOpen, setAuthOpen] = useState(false);
+  const [authEmail, setAuthEmail] = useState("");
+  const [authCode, setAuthCode] = useState("");
+  const [authStep, setAuthStep] = useState<"email" | "code">("email");
+  const [authLoading, setAuthLoading] = useState(false);
+  const [authError, setAuthError] = useState("");
+  const [pendingDownload, setPendingDownload] = useState<PendingDownload | null>(null);
+  const [downloadingKey, setDownloadingKey] = useState("");
+  const [quotaRequestOpen, setQuotaRequestOpen] = useState(false);
+  const [quotaRequestLoading, setQuotaRequestLoading] = useState(false);
+  const [quotaRequestDone, setQuotaRequestDone] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -206,6 +248,36 @@ export function BookLookup() {
     return downloadEditions.filter((edition) => edition.format === downloadFormat);
   }, [downloadEditions, downloadFormat]);
   const savedIds = useMemo(() => new Set(savedBooks.map((item) => item.id)), [savedBooks]);
+  const authToken = session?.access_token || "";
+
+  const refreshQuota = useCallback(async (token = authToken) => {
+    const response = await fetch("/api/quota", {
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      cache: "no-store",
+    });
+    const data = (await response.json()) as { quota?: QuotaSnapshot };
+    if (data.quota) setQuota(data.quota);
+  }, [authToken]);
+
+  useEffect(() => {
+    trackProductEvent("page_view", { page: window.location.pathname || "/" });
+    const supabase = getSupabaseBrowserClient();
+    const quotaTimer = window.setTimeout(() => void refreshQuota(), 0);
+    if (!supabase) return () => window.clearTimeout(quotaTimer);
+
+    void supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session);
+      if (data.session?.access_token) void refreshQuota(data.session.access_token);
+    });
+    const { data } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      setSession(nextSession);
+      void refreshQuota(nextSession?.access_token || "");
+    });
+    return () => {
+      window.clearTimeout(quotaTimer);
+      data.subscription.unsubscribe();
+    };
+  }, [refreshQuota]);
 
   function switchView(next: "find" | "shelf") {
     startTransition(() => setView(next));
@@ -255,6 +327,12 @@ export function BookLookup() {
     setLoading(true);
     setSearched(true);
     setSelected(null);
+    trackProductEvent("search_submitted", {
+      query_normalized: normalizedQuery.toLowerCase(),
+      query_length: normalizedQuery.length,
+      query_type: requestedMode === "isbn" ? "isbn" : "mixed",
+      page: window.location.pathname || "/",
+    });
     try {
       const params = new URLSearchParams({ q: normalizedQuery, mode: requestedMode });
       const response = await fetch(`/api/books/search?${params}`);
@@ -276,7 +354,13 @@ export function BookLookup() {
       setFilter(requestedFilter);
       if (requestedMode === "isbn" && nextBooks.length === 1) setSelected(nextBooks[0]);
       if (data.partial) setNotice("Some catalogs were unavailable. Showing the sources that responded.");
-      trackProductEvent("search_succeeded", { mode: requestedMode, result_count: nextBooks.length, partial: Boolean(data.partial) });
+      trackProductEvent(nextDownloads.length ? "zlib_results_loaded" : "search_no_results", {
+        query_normalized: normalizedQuery.toLowerCase(),
+        query_length: normalizedQuery.length,
+        query_type: requestedMode === "isbn" ? "isbn" : "mixed",
+        result_count: nextDownloads.length,
+        formats_available: Array.from(new Set(nextDownloads.map((edition) => edition.format))).length,
+      });
     } catch (reason) {
       setBooks([]);
       setDownloadEditions([]);
@@ -446,6 +530,132 @@ export function BookLookup() {
     }
   }
 
+  async function downloadEdition(edition: DownloadEdition, token = authToken) {
+    const key = `${edition.id}-${edition.format}`;
+    setDownloadingKey(key);
+    setError("");
+    trackProductEvent("download_requested", {
+      source: "zlibrary",
+      format: edition.format,
+      has_quota: quota ? quota.remainingDownloads > 0 : true,
+    });
+    try {
+      const response = await fetch(`/api/books/download?token=${encodeURIComponent(edition.downloadIntent)}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      });
+      if (response.status === 429) {
+        const data = (await response.json()) as { error?: string; quota?: QuotaSnapshot };
+        if (data.quota) setQuota(data.quota);
+        setPendingDownload({ edition });
+        setAuthOpen(true);
+        setAuthError("");
+        trackProductEvent("download_quota_blocked", { source: "zlibrary", format: edition.format });
+        trackProductEvent("login_prompt_shown", { source: "quota_block" });
+        return;
+      }
+      if (!response.ok) {
+        const data = (await response.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(data?.error || "Download failed before the file could start.");
+      }
+      const blob = await response.blob();
+      const anchor = document.createElement("a");
+      anchor.href = URL.createObjectURL(blob);
+      anchor.download = fileNameFromDisposition(response.headers.get("content-disposition"), `${edition.title}.${edition.format}`);
+      anchor.click();
+      window.setTimeout(() => URL.revokeObjectURL(anchor.href), 60_000);
+      setNotice(`Download started. ${response.headers.get("x-shelfmark-downloads-remaining") || "Quota"} left today.`);
+      trackProductEvent("download_started", { source: "zlibrary", format: edition.format });
+      void refreshQuota();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Download failed before the file could start.");
+      trackProductEvent("download_failed", { source: "zlibrary", format: edition.format, failure_stage: "client" });
+    } finally {
+      setDownloadingKey("");
+    }
+  }
+
+  async function sendAuthCode(event: FormEvent) {
+    event.preventDefault();
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) {
+      setAuthError("Supabase is not configured yet.");
+      return;
+    }
+    setAuthLoading(true);
+    setAuthError("");
+    try {
+      const { error: signInError } = await supabase.auth.signInWithOtp({
+        email: authEmail.trim(),
+        options: { shouldCreateUser: true },
+      });
+      if (signInError) throw signInError;
+      setAuthStep("code");
+    } catch (reason) {
+      setAuthError(reason instanceof Error ? reason.message : "Could not send the code.");
+    } finally {
+      setAuthLoading(false);
+    }
+  }
+
+  async function verifyAuthCode(event: FormEvent) {
+    event.preventDefault();
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) {
+      setAuthError("Supabase is not configured yet.");
+      return;
+    }
+    setAuthLoading(true);
+    setAuthError("");
+    try {
+      const { data, error: verifyError } = await supabase.auth.verifyOtp({
+        email: authEmail.trim(),
+        token: authCode.trim(),
+        type: "email",
+      });
+      if (verifyError) throw verifyError;
+      setSession(data.session);
+      setAuthOpen(false);
+      setAuthStep("email");
+      setAuthCode("");
+      trackProductEvent("login_completed", { method: "email_otp" });
+      await refreshQuota(data.session?.access_token || "");
+      const nextDownload = pendingDownload;
+      setPendingDownload(null);
+      if (nextDownload) void downloadEdition(nextDownload.edition, data.session?.access_token || "");
+    } catch (reason) {
+      setAuthError(reason instanceof Error ? reason.message : "The code could not be verified.");
+    } finally {
+      setAuthLoading(false);
+    }
+  }
+
+  async function submitQuotaRequest(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setQuotaRequestLoading(true);
+    setAuthError("");
+    const form = new FormData(event.currentTarget);
+    try {
+      const response = await fetch("/api/quota/requests", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+        },
+        body: JSON.stringify({
+          expectedDailyDownloads: form.get("expectedDailyDownloads"),
+          useCase: form.get("useCase"),
+        }),
+      });
+      if (!response.ok) throw new Error("Could not record this request.");
+      setQuotaRequestDone(true);
+      trackProductEvent("quota_request_submitted", { source: "quota_panel" });
+    } catch (reason) {
+      setAuthError(reason instanceof Error ? reason.message : "Could not record this request.");
+    } finally {
+      setQuotaRequestLoading(false);
+    }
+  }
+
   return (
     <main className="app-shell">
       <header className="topbar">
@@ -462,11 +672,10 @@ export function BookLookup() {
           </button>
         </nav>
         <div className="topbar-links">
-          <a className="studio-link" href="https://bulidoge.site/products/shelfmark">DBL-TOOLS</a>
-          <div className="account-actions" aria-label="Account access">
-            <button type="button" disabled title="Account access is planned for a later release">Log in</button>
-            <button className="account-primary" type="button" disabled title="Account registration is planned for a later release">Create account</button>
-          </div>
+          <QuotaPill quota={quota} onNeedMore={() => setQuotaRequestOpen(true)} />
+          <button className="signin-button" type="button" onClick={() => { setAuthOpen(true); trackProductEvent("login_prompt_shown", { source: "header" }); }}>
+            {session?.user.email || "Sign in"}
+          </button>
         </div>
       </header>
 
@@ -563,6 +772,8 @@ export function BookLookup() {
                       total={downloadTotal}
                       format={downloadFormat}
                       onFormat={setDownloadFormat}
+                      downloadingKey={downloadingKey}
+                      onDownload={(edition) => void downloadEdition(edition)}
                     />
                   ) : (
                     <BookResults
@@ -600,6 +811,32 @@ export function BookLookup() {
         />
       )}
 
+      {authOpen ? (
+        <AuthDialog
+          email={authEmail}
+          code={authCode}
+          step={authStep}
+          loading={authLoading}
+          error={authError}
+          pendingDownload={Boolean(pendingDownload)}
+          onEmail={setAuthEmail}
+          onCode={setAuthCode}
+          onClose={() => { setAuthOpen(false); setPendingDownload(null); }}
+          onSendCode={sendAuthCode}
+          onVerifyCode={verifyAuthCode}
+        />
+      ) : null}
+
+      {quotaRequestOpen ? (
+        <QuotaRequestDialog
+          loading={quotaRequestLoading}
+          done={quotaRequestDone}
+          error={authError}
+          onClose={() => { setQuotaRequestOpen(false); setQuotaRequestDone(false); setAuthError(""); }}
+          onSubmit={submitQuotaRequest}
+        />
+      ) : null}
+
       <footer id="data-notice">
         <div><strong>Shelfmark</strong><span>Find the book. Choose the edition.</span></div>
         <p>Search preferences and local shelf files stay in this browser.</p>
@@ -610,6 +847,121 @@ export function BookLookup() {
         </div>
       </footer>
     </main>
+  );
+}
+
+function QuotaPill({ quota, onNeedMore }: { quota: QuotaSnapshot | null; onNeedMore: () => void }) {
+  const label = quota?.subject.kind === "user" ? "Signed in" : "Guest";
+  return (
+    <details className="quota-pill">
+      <summary>
+        <LockKeyhole size={14} />
+        <span>{quota ? `${label} · Downloads ${quota.remainingDownloads}/${quota.subject.dailyDownloads}` : "Quota"}</span>
+      </summary>
+      <div className="quota-popover">
+        <strong>{quota ? `${quota.remainingDownloads} downloads left today` : "Checking quota"}</strong>
+        <span>Search is unlimited. Downloads reset {quota ? formatDate(quota.resetAt) : "daily"}.</span>
+        <button type="button" onClick={onNeedMore}>Need more downloads?</button>
+      </div>
+    </details>
+  );
+}
+
+function AuthDialog({
+  email,
+  code,
+  step,
+  loading,
+  error,
+  pendingDownload,
+  onEmail,
+  onCode,
+  onClose,
+  onSendCode,
+  onVerifyCode,
+}: {
+  email: string;
+  code: string;
+  step: "email" | "code";
+  loading: boolean;
+  error: string;
+  pendingDownload: boolean;
+  onEmail: (value: string) => void;
+  onCode: (value: string) => void;
+  onClose: () => void;
+  onSendCode: (event: FormEvent) => void;
+  onVerifyCode: (event: FormEvent) => void;
+}) {
+  return (
+    <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="auth-title">
+      <section className="modal-panel auth-panel">
+        <button className="modal-close" type="button" onClick={onClose} aria-label="Close sign in"><X size={18} /></button>
+        <p className="eyebrow"><span>LOGIN</span> Free account</p>
+        <h2 id="auth-title">Sign in to continue downloading</h2>
+        <p>Create your free Shelfmark account with a 6-digit email code. Signed-in users get 10 downloads per day.</p>
+        {pendingDownload ? <div className="pending-note"><Download size={16} /> Your download will continue after sign in.</div> : null}
+        {step === "email" ? (
+          <form className="auth-form" onSubmit={onSendCode}>
+            <label htmlFor="auth-email">Email</label>
+            <input id="auth-email" type="email" value={email} onChange={(event) => onEmail(event.target.value)} autoComplete="email" required />
+            <button className="find-button" type="submit" disabled={loading}>{loading ? <LoaderCircle className="spin" size={16} /> : null} Send code</button>
+          </form>
+        ) : (
+          <form className="auth-form" onSubmit={onVerifyCode}>
+            <label htmlFor="auth-code">6-digit code</label>
+            <input id="auth-code" value={code} onChange={(event) => onCode(event.target.value.replace(/\D/g, "").slice(0, 6))} inputMode="numeric" autoComplete="one-time-code" required />
+            <button className="find-button" type="submit" disabled={loading || code.length < 6}>{loading ? <LoaderCircle className="spin" size={16} /> : null} Verify and continue</button>
+          </form>
+        )}
+        {error ? <ErrorMessage message={error} /> : null}
+      </section>
+    </div>
+  );
+}
+
+function QuotaRequestDialog({
+  loading,
+  done,
+  error,
+  onClose,
+  onSubmit,
+}: {
+  loading: boolean;
+  done: boolean;
+  error: string;
+  onClose: () => void;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+}) {
+  return (
+    <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="quota-request-title">
+      <section className="modal-panel quota-request-panel">
+        <button className="modal-close" type="button" onClick={onClose} aria-label="Close request"><X size={18} /></button>
+        <p className="eyebrow"><span>LIMIT</span> Request access</p>
+        <h2 id="quota-request-title">{done ? "Request recorded" : "Need more downloads?"}</h2>
+        {done ? (
+          <p>Thanks. The request has been recorded for review.</p>
+        ) : (
+          <form className="auth-form" onSubmit={onSubmit}>
+            <label htmlFor="expectedDailyDownloads">Expected daily downloads</label>
+            <select id="expectedDailyDownloads" name="expectedDailyDownloads" defaultValue="20">
+              <option value="20">20</option>
+              <option value="50">50</option>
+              <option value="100">100</option>
+              <option value="unlimited">Unlimited</option>
+            </select>
+            <label htmlFor="useCase">Use case</label>
+            <select id="useCase" name="useCase" defaultValue="personal_reading">
+              <option value="personal_reading">Personal reading</option>
+              <option value="study_research">Study & research</option>
+              <option value="collection_management">Collection management</option>
+              <option value="other">Other</option>
+            </select>
+            <button className="find-button" type="submit" disabled={loading}>{loading ? <LoaderCircle className="spin" size={16} /> : null} Submit request</button>
+          </form>
+        )}
+        {error ? <ErrorMessage message={error} /> : null}
+      </section>
+    </div>
   );
 }
 
@@ -707,12 +1059,16 @@ function DownloadResults({
   total,
   format,
   onFormat,
+  downloadingKey,
+  onDownload,
 }: {
   editions: DownloadEdition[];
   visibleEditions: DownloadEdition[];
   total: number;
   format: string;
   onFormat: (format: string) => void;
+  downloadingKey: string;
+  onDownload: (edition: DownloadEdition) => void;
 }) {
   const formats = Array.from(new Set(editions.map((edition) => edition.format))).sort();
   return (
@@ -741,13 +1097,15 @@ function DownloadResults({
                   <p>{edition.author || "Author not listed"}</p>
                   <small>{[edition.publisher, edition.year, edition.language].filter(Boolean).join(" · ")}</small>
                 </div>
-                <a
+                <button
                   className="download-button"
-                  href={`/api/books/download?token=${encodeURIComponent(edition.downloadIntent)}`}
-                  onClick={() => trackProductEvent("download_started", { source: "Z-Library", format: edition.format })}
+                  type="button"
+                  disabled={downloadingKey === `${edition.id}-${edition.format}`}
+                  onClick={() => onDownload(edition)}
                 >
-                  <Download size={16} /> Download {edition.format.toUpperCase()}
-                </a>
+                  {downloadingKey === `${edition.id}-${edition.format}` ? <LoaderCircle className="spin" size={16} /> : <Download size={16} />}
+                  Download {edition.format.toUpperCase()}
+                </button>
               </article>
             ))}
           </div>

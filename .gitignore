@@ -52,6 +52,7 @@ next-env.d.ts
 
 # local visual QA captures and browser traces
 /.playwright-cli/
+/.tools/
 /tmp/
 /reports/design/
 

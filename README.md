@@ -1,22 +1,35 @@
 # Shelfmark
 
-Find the book. Choose how to read it.
+Find the book. Get the file.
 
-Shelfmark is an access-first book search tool for readers who want a clear, legitimate next step: a public-domain download, a library borrow link, a publisher preview, a purchase route, or a device-only shelf record.
+Live: https://books.bulidoge.site
 
-## Features
+Shelfmark is a download-focused book search tool. Search by ISBN, title, or author, confirm the right book from a compact preview, then compare available EPUB, PDF, MOBI, and AZW3 file options.
 
-- Search by title, author, or ISBN-10/ISBN-13
-- Merge Open Library, Project Gutenberg, and optional Google Books results
-- Label open-access download formats, borrow, preview, purchase, and catalog-only states explicitly
-- Save records to a private browser shelf without an account
-- Import user-owned EPUB/PDF files into browser IndexedDB and reopen them locally
-- Copy a clean book summary for notes or catalog work
-- Barcode scanning on supported Capacitor Android builds
+## What it does
 
-The product never treats an access-limited preview as a free download. For Open Library, `availability.status=open` or an equivalent readable, unrestricted response reveals the official Archive.org formats page. A restricted or lendable edition never receives a download action.
+- Search by title, author, ISBN-10, or ISBN-13
+- Show a compact book preview with cover, author, publisher, year, language, ISBN, and description
+- Find downloadable file versions and group formats into clear rows
+- Download through a server-side file flow instead of exposing upstream file URLs
+- Let guests try downloads before signing in
+- Use email OTP sign-in for higher daily download limits
+- Keep a browser-local shelf for saved records and user-imported EPUB/PDF files
 
-## 本地运行
+## Launch scope
+
+The Hacker News launch version focuses on one path:
+
+```text
+Search
+→ preview the likely book
+→ compare downloadable versions
+→ download a selected file format
+```
+
+Open Library and Google Books metadata may be used to improve the top preview. Downloadable versions are handled by the configured server-side connector.
+
+## Local development
 
 ```bash
 npm install
@@ -24,27 +37,30 @@ cp .env.example .env.local
 npm run dev
 ```
 
-Configure `.env.local` when needed:
+Useful environment variables:
 
 ```text
+NEXT_PUBLIC_SITE_URL=http://localhost:3000
 GOOGLE_BOOKS_API_KEY=optional_server_side_key
 OPEN_LIBRARY_CONTACT_EMAIL=you@example.com
-NEXT_PUBLIC_SITE_URL=http://localhost:3000
+
+ZLIBRARY_BASE_URL=
+ZLIBRARY_EMAIL=
+ZLIBRARY_PASSWORD=
+ZLIBRARY_TIMEOUT_MS=30000
+SHELFMARK_DOWNLOAD_SECRET=
+SHELFMARK_QUOTA_SECRET=
+
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+ADMIN_EMAILS=
+
+NEXT_PUBLIC_POSTHOG_KEY=
+NEXT_PUBLIC_POSTHOG_HOST=https://us.i.posthog.com
 ```
 
-The Google key is read only by the Next.js Route Handler and is never sent to the browser. Open Library and Gutendex can work without it.
-Set `OPEN_LIBRARY_CONTACT_EMAIL` to an address where Open Library can reach you. Shelfmark sends it only in the server-side Open Library request identity headers.
-
-If Windows exposes an `HTTPS_PROXY` but Node does not reach Open Library during local development, use Node 24+'s environment-proxy switch for that terminal:
-
-```powershell
-$env:NODE_OPTIONS="--use-env-proxy"
-npm run dev -- --hostname 127.0.0.1
-```
-
-This is a local network setting, not a production dependency. Vercel can call the public APIs directly unless your deployment environment requires its own egress proxy.
-
-## 验证
+## Verification
 
 ```bash
 npm run check
@@ -52,17 +68,4 @@ npm test
 npm run build
 ```
 
-## Data and privacy
-
-- Metadata and legitimate destination links come from [Open Library](https://openlibrary.org/developers/api), [Google Books](https://developers.google.com/books/docs/v1/using), and [Gutendex](https://gutendex.com/).
-- Saved records use browser local storage. User EPUB/PDF files use browser IndexedDB and are not uploaded.
-- Availability varies by edition, country, and source policy. Users must check local copyright rules.
-- Source details and the product boundary are recorded in [docs/DATA-SOURCES.md](docs/DATA-SOURCES.md).
-
-## Explicit non-goals
-
-- No Z-Library or shadow-library integration
-- No DRM circumvention or copyright-unclear file sources
-- No accounts, cloud sync, community, team permissions, or admin console
-
-The earlier Z-Library feasibility note is retained as an audit record in [docs/ZLIBRARY-FEASIBILITY.md](docs/ZLIBRARY-FEASIBILITY.md); it is not a product dependency.
+HN launch specification: [docs/HN-LAUNCH-SPEC.md](docs/HN-LAUNCH-SPEC.md)

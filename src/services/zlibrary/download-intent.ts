@@ -14,11 +14,16 @@ const payloadSchema = z.object({
 export type DownloadIntentPayload = z.infer<typeof payloadSchema>;
 
 function signingKey() {
-  const secret = process.env.ZLIBRARY_API_TOKEN?.trim();
-  if (!secret) throw new Error("ZLIBRARY_API_TOKEN is required to sign downloads");
+  const secret = process.env.SHELFMARK_DOWNLOAD_SECRET?.trim()
+    || process.env.ZLIBRARY_API_TOKEN?.trim()
+    || process.env.SHELFMARK_QUOTA_SECRET?.trim();
+  if (!secret && process.env.NODE_ENV === "production") {
+    throw new Error("SHELFMARK_DOWNLOAD_SECRET is required to sign downloads");
+  }
+  const resolvedSecret = secret || "shelfmark-dev-download-secret";
   return crypto.subtle.importKey(
     "raw",
-    new TextEncoder().encode(secret),
+    new TextEncoder().encode(resolvedSecret),
     { name: "HMAC", hash: "SHA-256" },
     false,
     ["sign", "verify"],
