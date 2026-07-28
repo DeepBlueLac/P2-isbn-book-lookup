@@ -1,0 +1,17 @@
+.tools/
+.next/
+.open-next/
+.wrangler/
+.playwright-cli/
+.supabase/
+tmp/
+reports/
+android/
+out/
+build/
+node_modules/
+*.tsbuildinfo
+cloudflare-env.d.ts
+.dev.vars
+.dev.vars*
+design-qa.md

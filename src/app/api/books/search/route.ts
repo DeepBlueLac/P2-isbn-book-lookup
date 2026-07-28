@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { isValidIsbn, normalizeIsbn } from "@/core/books";
 import { searchBookSources } from "@/services/book-sources";
+import { quotaCookieFor, resolveQuota } from "@/services/quota";
+import { recordUsageEvent } from "@/services/usage-events";
 import { searchZLibrary } from "@/services/zlibrary/client";
 import { createDownloadIntent } from "@/services/zlibrary/download-intent";
 import { downloadEditionRank } from "@/services/zlibrary/ranking";
@@ -21,7 +23,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const catalogPromise = searchBookSources({ query: normalizedQuery, mode, googleKey: process.env.GOOGLE_BOOKS_API_KEY });
-    const zLibraryEnabled = Boolean(process.env.ZLIBRARY_BASE_URL?.trim() && process.env.ZLIBRARY_API_TOKEN?.trim());
+    const zLibraryEnabled = Boolean(process.env.ZLIBRARY_BASE_URL?.trim());
     const zLibraryPromise = zLibraryEnabled
       ? searchZLibrary({ query: normalizedQuery })
       : Promise.resolve(null);
@@ -71,7 +73,23 @@ export async function GET(request: NextRequest) {
     if (availableSources.length === 0) {
       return NextResponse.json({ error: "Book sources are temporarily unavailable.", sources }, { status: 503 });
     }
-    return NextResponse.json(
+    const resolvedQuota = await resolveQuota(request);
+    const zlibrarySource = sources.find((source) => source.source === "Z-Library");
+    await recordUsageEvent({
+      type: "search",
+      subject: resolvedQuota.subject,
+      query: normalizedQuery,
+      mode,
+      resultCount: books.length,
+      downloadableCount: downloadEditions.length,
+      zlibraryStatus: zlibrarySource?.status === "available"
+        ? "available"
+        : zlibrarySource?.status === "skipped"
+          ? "skipped"
+          : "unavailable",
+      partial: sources.some((source) => source.status === "unavailable"),
+    });
+    const response = NextResponse.json(
       {
         total: books.length,
         books,
@@ -82,6 +100,9 @@ export async function GET(request: NextRequest) {
       },
       { headers: { "Cache-Control": "private, no-store" } },
     );
+    if (resolvedQuota.guestSetCookie) response.headers.append("Set-Cookie", resolvedQuota.guestSetCookie);
+    response.headers.append("Set-Cookie", await quotaCookieFor(resolvedQuota.subject, resolvedQuota.quota));
+    return response;
   } catch {
     return NextResponse.json({ error: "The catalog took too long to respond. Try again shortly." }, { status: 504 });
   }

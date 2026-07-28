@@ -2,6 +2,8 @@ import Link from "next/link";
 
 type TaskLink = { href: string; label: string };
 
+type TaskFaq = { question: string; answer: string };
+
 type TaskLandingProps = {
   eyebrow: string;
   title: string;
@@ -12,6 +14,7 @@ type TaskLandingProps = {
   access?: "public-domain";
   steps: string[];
   related: TaskLink[];
+  faq?: TaskFaq[];
 };
 
 export function TaskLanding({
@@ -24,7 +27,19 @@ export function TaskLanding({
   access,
   steps,
   related,
+  faq,
 }: TaskLandingProps) {
+  const faqJsonLd = faq?.length
+    ? {
+        "@context": "https://schema.org",
+        "@type": "FAQPage",
+        mainEntity: faq.map((item) => ({
+          "@type": "Question",
+          name: item.question,
+          acceptedAnswer: { "@type": "Answer", text: item.answer },
+        })),
+      }
+    : null;
   return (
     <main className="task-page">
       <header className="task-header">
@@ -50,6 +65,25 @@ export function TaskLanding({
           <h2>What happens next</h2>
           <ol>{steps.map((step) => <li key={step}>{step}</li>)}</ol>
         </section>
+
+        {faq?.length ? (
+          <section className="task-faq">
+            <h2>Frequently asked questions</h2>
+            {faq.map((item) => (
+              <div key={item.question}>
+                <h3>{item.question}</h3>
+                <p>{item.answer}</p>
+              </div>
+            ))}
+          </section>
+        ) : null}
+
+        {faqJsonLd ? (
+          <script
+            type="application/ld+json"
+            dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
+          />
+        ) : null}
 
         <nav className="task-related" aria-label="Related Shelfmark tasks">
           <strong>Other ways to search</strong>
