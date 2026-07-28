@@ -1,4 +1,4 @@
-﻿# Shelfmark HN Launch QA Log
+# Shelfmark HN Launch QA Log
 
 ## 2026-07-28 Local API Smoke
 
