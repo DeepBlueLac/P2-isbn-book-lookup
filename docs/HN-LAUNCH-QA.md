@@ -128,3 +128,37 @@ Note:
 
 - The first Preview deployment had unreliable copied Z-Library Preview variables. Preview/Development Z-Library env was rewritten from local `.env.local`, then redeployed.
 - `.vercelignore` was added to exclude local tools/caches after the first Preview upload exceeded Vercel's file-size limit.
+
+## 2026-07-29 Cloudflare Production Smoke
+
+Official production domain:
+
+```text
+https://books.bulidoge.site
+```
+
+Deployment:
+
+- Platform: Cloudflare Workers / OpenNext
+- Worker: `dbl-tools-shelfmark`
+- Custom domain: `books.bulidoge.site`
+- Worker version: `e9d32498-7fd2-43b7-a456-5c77fb1bca9e`
+
+Production API smoke:
+
+| Check | Result |
+| --- | --- |
+| Homepage | HTTP 200 |
+| `/api/books/search?q=火星救援&mode=search` | HTTP 200 |
+| Catalog results | 1 book |
+| Z-Library downloadable editions | 30 |
+| First downloadable format | EPUB |
+| Download intent generated | Yes |
+| `/api/books/download?token=...` | HTTP 200 |
+| Download response content type | `application/epub+zip` |
+| Attachment header | Present |
+
+Validation method:
+
+- Search used the official production domain, not the Vercel deployment URL.
+- Download validation read response headers only with `ResponseHeadersRead`; no book file was saved to the repository.
