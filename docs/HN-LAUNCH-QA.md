@@ -24,7 +24,7 @@ Results:
 
 Validation method:
 
-- Search request used `/api/books/search?q=ç«æ˜Ÿæ•‘æ´&mode=search`.
+- Search request used `/api/books/search?q=%E7%81%AB%E6%98%9F%E6%95%91%E6%8F%B4&mode=search`.
 - Download request used `/api/books/download?token=...`.
 - Download validation read response headers only with `ResponseHeadersRead`; no book file was saved to the repository.
 
@@ -68,7 +68,7 @@ Application API smoke:
 
 | Check | Result |
 | --- | --- |
-| `/api/books/search?q=ç«æ˜Ÿæ•‘æ´&mode=search` | HTTP 200 |
+| `/api/books/search?q=%E7%81%AB%E6%98%9F%E6%95%91%E6%8F%B4&mode=search` | HTTP 200 |
 | Z-Library downloadable editions | 30 |
 | Search event persisted | Yes |
 | `/api/quota/requests` | HTTP 201 |
@@ -105,7 +105,7 @@ Preview API smoke:
 | --- | --- |
 | Direct internal Z-Library API with bearer token | HTTP 200 |
 | Direct Z-Library results | 30 books |
-| Public search API for `ç«æ˜Ÿæ•‘æ´` | HTTP 200 |
+| Public search API for `%E7%81%AB%E6%98%9F%E6%95%91%E6%8F%B4` | HTTP 200 |
 | Public search downloadable editions | 30 |
 | First downloadable format | EPUB |
 | Preview proxy download | HTTP 200 |
@@ -149,7 +149,7 @@ Production API smoke:
 | Check | Result |
 | --- | --- |
 | Homepage | HTTP 200 |
-| `/api/books/search?q=ç«æ˜Ÿæ•‘æ´&mode=search` | HTTP 200 |
+| `/api/books/search?q=%E7%81%AB%E6%98%9F%E6%95%91%E6%8F%B4&mode=search` | HTTP 200 |
 | Catalog results | 1 book |
 | Z-Library downloadable editions | 30 |
 | First downloadable format | EPUB |
