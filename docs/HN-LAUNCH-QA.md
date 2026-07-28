@@ -162,3 +162,14 @@ Validation method:
 
 - Search used the official production domain, not the Vercel deployment URL.
 - Download validation read response headers only with `ResponseHeadersRead`; no book file was saved to the repository.
+
+Production mobile UI smoke:
+
+| Check | Result |
+| --- | --- |
+| Viewport | `390x844` |
+| Search submitted from UI | Passed |
+| Search API on official domain | HTTP 200 |
+| Result page contains format buttons | Passed |
+| Buttons found | EPUB, PDF, MOBI, AZW3 |
+| Screenshot | `tmp/production-mobile-download-results.png` |
