@@ -1,4 +1,4 @@
-# Shelfmark HN Launch QA Log
+﻿# Shelfmark HN Launch QA Log
 
 ## 2026-07-28 Local API Smoke
 
@@ -6,7 +6,7 @@ Environment:
 
 - Local URL: `http://127.0.0.1:3022`
 - Branch: `codex/p2-hn-launch`
-- Query: `火星救援`
+- Query: `ç«æ˜Ÿæ•‘æ´`
 
 Results:
 
@@ -24,7 +24,7 @@ Results:
 
 Validation method:
 
-- Search request used `/api/books/search?q=火星救援&mode=search`.
+- Search request used `/api/books/search?q=ç«æ˜Ÿæ•‘æ´&mode=search`.
 - Download request used `/api/books/download?token=...`.
 - Download validation read response headers only with `ResponseHeadersRead`; no book file was saved to the repository.
 
@@ -68,7 +68,7 @@ Application API smoke:
 
 | Check | Result |
 | --- | --- |
-| `/api/books/search?q=火星救援&mode=search` | HTTP 200 |
+| `/api/books/search?q=ç«æ˜Ÿæ•‘æ´&mode=search` | HTTP 200 |
 | Z-Library downloadable editions | 30 |
 | Search event persisted | Yes |
 | `/api/quota/requests` | HTTP 201 |
@@ -105,7 +105,7 @@ Preview API smoke:
 | --- | --- |
 | Direct internal Z-Library API with bearer token | HTTP 200 |
 | Direct Z-Library results | 30 books |
-| Public search API for `火星救援` | HTTP 200 |
+| Public search API for `ç«æ˜Ÿæ•‘æ´` | HTTP 200 |
 | Public search downloadable editions | 30 |
 | First downloadable format | EPUB |
 | Preview proxy download | HTTP 200 |
@@ -117,7 +117,7 @@ Preview mobile UI smoke:
 
 | Check | Result |
 | --- | --- |
-| Viewport | `390×844` |
+| Viewport | `390Ã—844` |
 | Search submitted from UI | Passed |
 | API returned downloadable editions | 30 |
 | Result page contains format buttons | Passed |
@@ -142,14 +142,14 @@ Deployment:
 - Platform: Cloudflare Workers / OpenNext
 - Worker: `dbl-tools-shelfmark`
 - Custom domain: `books.bulidoge.site`
-- Worker version: `e9d32498-7fd2-43b7-a456-5c77fb1bca9e`
+- Worker version: `87cdbd1a-1eaa-4f7e-bd98-06072d6d1c53`
 
 Production API smoke:
 
 | Check | Result |
 | --- | --- |
 | Homepage | HTTP 200 |
-| `/api/books/search?q=火星救援&mode=search` | HTTP 200 |
+| `/api/books/search?q=ç«æ˜Ÿæ•‘æ´&mode=search` | HTTP 200 |
 | Catalog results | 1 book |
 | Z-Library downloadable editions | 30 |
 | First downloadable format | EPUB |
@@ -173,3 +173,4 @@ Production mobile UI smoke:
 | Result page contains format buttons | Passed |
 | Buttons found | EPUB, PDF, MOBI, AZW3 |
 | Screenshot | `tmp/production-mobile-download-results.png` |
+
