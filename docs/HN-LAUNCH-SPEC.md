@@ -52,8 +52,8 @@ https://books.bulidoge.site/privacy
 
 Google Search Consoleï¼š
 
-- ä½¿ç”¨ Domain propertyï¼š`bulidoge.site`ã€‚
-- é€šè¿‡ DNS TXT éªŒè¯ã€‚
+- Use URL-prefix property: `https://books.bulidoge.site/`.
+- Verify with the method Google offers for this URL-prefix property; HTML file/tag is acceptable.
 - æäº¤ `https://books.bulidoge.site/sitemap.xml`ã€‚
 - ä½¿ç”¨ URL Inspection è¯·æ±‚ 5 ä¸ªæ ¸å¿ƒé¡µé¢æ”¶å½•ã€‚
 
