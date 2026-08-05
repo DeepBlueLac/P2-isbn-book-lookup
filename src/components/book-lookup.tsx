@@ -710,7 +710,7 @@ export function BookLookup() {
                     <span>Explore</span>
                     <Link href="/find-book-by-title">Title or author</Link>
                     <Link href="/isbn-lookup">ISBN lookup</Link>
-                    <Link href="/public-domain-book-finder">Browse by format</Link>
+                    <Link href="/downloadable-book-files">Browse by format</Link>
                   </nav>
                   {error ? <ErrorMessage message={error} /> : null}
                   {notice ? <NoticeMessage message={notice} /> : null}

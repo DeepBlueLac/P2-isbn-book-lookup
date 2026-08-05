@@ -28,7 +28,7 @@ export default function FindBookByTitlePage() {
     ]}
     related={[
       { href: "/isbn-lookup", label: "Look up an exact ISBN" },
-      { href: "/public-domain-book-finder", label: "Search downloadable book files" },
+      { href: "/downloadable-book-files", label: "Search downloadable book files" },
     ]}
     faq={[
       {

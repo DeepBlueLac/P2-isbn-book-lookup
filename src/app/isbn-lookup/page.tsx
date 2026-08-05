@@ -28,7 +28,7 @@ export default function IsbnLookupPage() {
     ]}
     related={[
       { href: "/find-book-by-title", label: "Find a book by title or author" },
-      { href: "/public-domain-book-finder", label: "Search downloadable book files" },
+      { href: "/downloadable-book-files", label: "Search downloadable book files" },
     ]}
     faq={[
       {

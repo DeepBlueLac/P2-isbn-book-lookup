@@ -4,7 +4,7 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "Shelfmark",
     short_name: "Shelfmark",
-    description: "Find a legitimate way to read a book.",
+    description: "Search by ISBN, title, or author and find downloadable book file options faster.",
     start_url: "/",
     display: "standalone",
     background_color: "#f2eee5",
